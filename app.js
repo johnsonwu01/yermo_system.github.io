@@ -34,6 +34,14 @@ let currentUser = null;
 let currentSeat = null;
 let menuStatus = {}; // 儲存餐點庫存狀態
 
+// HTML 轉義函數（防止 XSS）
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // 自定義提示框函數（替代 alert，適配平板）
 window.showToast = (message, type = "info", duration = 3000) => {
   // 確保 DOM 已加載
@@ -819,8 +827,9 @@ window.submitOrder = async () => {
       timestamp: Date.now(),
     };
 
-    // 如果有備註，才加入訂單資料
-    if (note) {
+    // 保存備註（即使為空也保存，這樣可以區分"沒有備註"和"備註為空"）
+    // 但為了節省空間，如果為空字符串就不保存
+    if (note && note.length > 0) {
       orderData.note = note;
     }
 
@@ -1147,16 +1156,18 @@ function loadAdminData() {
       }
 
       let itemStr = "";
-      data.items.forEach((i) => {
-        const tagClass = i.type === "drink" ? "drink" : "food";
-        const tempStr =
-          i.type === "drink"
-            ? i.temp === "ice"
-              ? '<span style="color:#06d6a0">[冰]</span>'
-              : '<span style="color:#ef233c">[熱]</span>'
-            : "";
-        itemStr += `<span class="tag ${tagClass}">${i.name} ${tempStr} x${i.count}</span>`;
-      });
+      if (data.items && Array.isArray(data.items)) {
+        data.items.forEach((i) => {
+          const tagClass = i.type === "drink" ? "drink" : "food";
+          const tempStr =
+            i.type === "drink"
+              ? i.temp === "ice"
+                ? '<span style="color:#06d6a0">[冰]</span>'
+                : '<span style="color:#ef233c">[熱]</span>'
+              : "";
+          itemStr += `<span class="tag ${tagClass}">${i.name} ${tempStr} x${i.count}</span>`;
+        });
+      }
 
       // 換算時間
       const time = new Date(data.timestamp).toLocaleTimeString([], {
@@ -1174,10 +1185,15 @@ function loadAdminData() {
         servedTimeStr = `<span style="color:var(--success); font-size:10px; margin-left:5px;">✓ ${servedTime}</span>`;
       }
 
-      // 備註顯示
+      // 備註顯示 - 檢查並顯示備註
       let noteStr = "";
-      if (data.note && data.note.trim()) {
-        noteStr = `<div style="font-size:11px; color:#ffb800; margin-bottom:5px; padding:5px; background:rgba(255,184,0,0.1); border-radius:4px; border-left:3px solid #ffb800;">📝 備註：${data.note}</div>`;
+      if (data.note !== undefined && data.note !== null) {
+        const note = String(data.note).trim();
+        if (note.length > 0) {
+          noteStr = `<div style="font-size:11px; color:#ffb800; margin-bottom:5px; padding:5px; background:rgba(255,184,0,0.1); border-radius:4px; border-left:3px solid #ffb800;">📝 備註：${escapeHtml(
+            note
+          )}</div>`;
+        }
       }
 
       div.innerHTML = `
