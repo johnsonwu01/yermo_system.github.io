@@ -248,6 +248,27 @@
         <h3>餐點 Food</h3>
         <div id="menu-foods"></div>
 
+        <!-- 備註區 -->
+        <div style="margin-top: 30px; margin-bottom: 20px">
+          <h3 style="font-size: 16px; margin-bottom: 10px">備註</h3>
+          <textarea
+            id="order-note"
+            style="
+              width: 100%;
+              min-height: 80px;
+              padding: 12px;
+              background: #333;
+              color: white;
+              border: 1px solid #444;
+              border-radius: 6px;
+              box-sizing: border-box;
+              font-size: 14px;
+              font-family: inherit;
+              resize: vertical;
+            "
+          ></textarea>
+        </div>
+
         <div style="margin-top: 30px; text-align: center">
           <p>
             目前選擇：<span id="select-count-drink">0</span> 飲 /
@@ -445,7 +466,13 @@
           </div>
           <div
             id="admin-orders"
-            style="max-height: 300px; overflow-y: auto"
+            style="
+              max-height: 300px;
+              overflow-y: auto;
+              scrollbar-width: none;
+              -ms-overflow-style: none;
+            "
+            class="hide-scrollbar"
           ></div>
         </div>
 

@@ -464,3 +464,13 @@ h1 {
     transform: scale(1);
   }
 }
+
+/* 隱藏滾動條但保持滾動功能 */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 和 Edge */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

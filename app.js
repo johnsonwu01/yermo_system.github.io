@@ -595,13 +595,14 @@ document.getElementById("btn-confirm-seat").onclick = async () => {
     const orderRef = ref(db, "orders/" + currentUser);
     const orderSnapshot = await get(orderRef);
 
+    let existingOrderData = null;
     if (orderSnapshot.exists()) {
       // 如果已有訂單，更新座位信息
       await update(orderRef, { seat: currentSeat });
 
       // 檢查是否已出餐
-      const orderData = orderSnapshot.val();
-      const isServed = orderData.served === true;
+      existingOrderData = orderSnapshot.val();
+      const isServed = existingOrderData.served === true;
 
       if (isServed) {
         // 已出餐，只能換位置，不進入點餐頁面
@@ -613,6 +614,15 @@ document.getElementById("btn-confirm-seat").onclick = async () => {
 
     // 未出餐或沒有訂單，進入點餐頁面
     renderMenu();
+
+    // 如果有訂單，載入之前的備註
+    if (existingOrderData && existingOrderData.note) {
+      const noteInput = document.getElementById("order-note");
+      if (noteInput) {
+        noteInput.value = existingOrderData.note;
+      }
+    }
+
     showPage("p-menu");
   } catch (error) {
     alert("選擇座位失敗，請重試");
@@ -796,15 +806,31 @@ window.submitOrder = async () => {
     return;
   }
 
+  // 獲取備註
+  const noteInput = document.getElementById("order-note");
+  const note = noteInput ? noteInput.value.trim() : "";
+
   document.getElementById("loading").style.display = "flex";
 
   try {
-    await set(ref(db, "orders/" + currentUser), {
+    const orderData = {
       seat: currentSeat,
       items: items,
       timestamp: Date.now(),
-    });
+    };
+
+    // 如果有備註，才加入訂單資料
+    if (note) {
+      orderData.note = note;
+    }
+
+    await set(ref(db, "orders/" + currentUser), orderData);
     await update(ref(db, "users/" + currentUser), { status: "done" });
+
+    // 清空備註輸入框
+    if (noteInput) {
+      noteInput.value = "";
+    }
 
     document.getElementById("loading").style.display = "none";
     showPage("p-done");
@@ -1148,6 +1174,12 @@ function loadAdminData() {
         servedTimeStr = `<span style="color:var(--success); font-size:10px; margin-left:5px;">✓ ${servedTime}</span>`;
       }
 
+      // 備註顯示
+      let noteStr = "";
+      if (data.note && data.note.trim()) {
+        noteStr = `<div style="font-size:11px; color:#ffb800; margin-bottom:5px; padding:5px; background:rgba(255,184,0,0.1); border-radius:4px; border-left:3px solid #ffb800;">📝 備註：${data.note}</div>`;
+      }
+
       div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
                     <span style="font-size:14px; color:var(--accent-glow); font-weight:bold;">${user}</span>
@@ -1161,6 +1193,7 @@ function loadAdminData() {
                     : "未選座"
                 }</div>
                 <div style="margin-bottom:8px;">${itemStr}</div>
+                ${noteStr}
                 <div style="text-align:right; display:flex; gap:5px; justify-content:flex-end;">
                     ${
                       data.seat && !data.seatReleased
@@ -1270,6 +1303,7 @@ window.exportOrdersToExcel = async () => {
       "餐點項目",
       "總飲品數",
       "總餐點數",
+      "備註",
     ]);
 
     // 處理每個訂單
@@ -1317,6 +1351,9 @@ window.exportOrdersToExcel = async () => {
       // 出餐狀態
       const servedStatus = orderData.served ? "已出餐" : "待出餐";
 
+      // 備註
+      const note = orderData.note ? orderData.note.trim() : "";
+
       // 添加行數據
       excelData.push([
         userId,
@@ -1329,6 +1366,7 @@ window.exportOrdersToExcel = async () => {
         foods.join("; "),
         drinkCount,
         foodCount,
+        note,
       ]);
     });
 
@@ -1348,6 +1386,7 @@ window.exportOrdersToExcel = async () => {
       { wch: 30 }, // 餐點項目
       { wch: 12 }, // 總飲品數
       { wch: 12 }, // 總餐點數
+      { wch: 30 }, // 備註
     ];
 
     // 添加工作表
