@@ -25,13 +25,16 @@
         <h3 style="margin-top: 0; margin-bottom: 15px">請輸入管理員密碼</h3>
         <form
           id="password-form"
+          name="password-form"
           onsubmit="event.preventDefault(); document.getElementById('password-submit').click();"
         >
           <input
             type="password"
             id="password-input"
+            name="password"
             placeholder="輸入密碼"
             autocomplete="current-password"
+            form="password-form"
             style="
               width: 100%;
               padding: 12px;
@@ -49,6 +52,7 @@
               type="submit"
               class="btn"
               id="password-submit"
+              form="password-form"
               style="flex: 1; margin: 0"
             >
               確認
@@ -499,7 +503,7 @@
         <div style="display: flex; gap: 10px; margin-bottom: 10px">
           <button
             class="btn"
-            onclick="exportOrdersToExcel()"
+            id="export-excel-btn"
             style="flex: 1; padding: 10px; font-size: 14px"
           >
             📊 匯出 Excel

@@ -1660,6 +1660,23 @@ setTimeout(() => {
   }
 }, 100);
 
+// 綁定匯出 Excel 按鈕
+setTimeout(() => {
+  const exportBtn = document.getElementById("export-excel-btn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.exportOrdersToExcel) {
+        window.exportOrdersToExcel();
+      } else {
+        console.error("exportOrdersToExcel 函數未定義");
+        alert("匯出功能尚未準備就緒，請稍後再試");
+      }
+    });
+  }
+}, 200);
+
 // 確保 toast 在頁面加載後可用
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
