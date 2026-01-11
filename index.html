@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>I人夜店 | Introvert's Night</title>
+    <!-- 引入自訂樣式 -->
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="loading"><div class="spinner"></div></div>
+
+    <div id="app">
+      <!-- 頁面 1: 報到 -->
+      <div id="p-checkin" class="page active">
+        <h1>
+          I 人夜店<br /><span style="font-size: 14px; color: #888"
+            >INTROVERT'S NIGHT</span
+          >
+        </h1>
+        <p style="text-align: center; margin-bottom: 30px">
+          請選擇您的報到名稱
+        </p>
+        <div id="user-list"></div>
+
+        <!-- 明顯的 Staff 入口 -->
+        <div class="staff-entry">
+          <span class="staff-link" onclick="promptAdmin()">Staff Only</span>
+        </div>
+      </div>
+
+      <!-- 頁面 2: 支付 -->
+      <div id="p-payment" class="page">
+        <h1>支付門票</h1>
+        <div
+          style="
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+          "
+        >
+          <p>門票費用：<strong>$350</strong></p>
+          <p style="font-size: 12px; color: #666">請掃描 LinePay 或支付現金</p>
+          <div
+            style="
+              width: 150px;
+              height: 150px;
+              background: #eee;
+              margin: 0 auto;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #aaa;
+            "
+          >
+            QR CODE
+          </div>
+        </div>
+        <p style="text-align: center; font-size: 12px; color: #888">
+          請向工作人員出示此畫面<br />確認支付完成
+        </p>
+        <button class="btn staff" id="btn-staff-confirm">
+          【工作人員點擊】支付完成
+        </button>
+        <button class="btn outline" onclick="showPage('p-checkin')">
+          返回
+        </button>
+      </div>
+
+      <!-- 頁面 3: 區域介紹 -->
+      <div id="p-zones" class="page">
+        <h2>選擇您的棲息地</h2>
+        <p
+          style="
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 20px;
+          "
+        >
+          探索五大區域，尋找屬於您的角落
+        </p>
+        <div id="zone-container"></div>
+      </div>
+
+      <!-- 頁面 4: 選位 -->
+      <div id="p-seat" class="page">
+        <h2 id="seat-zone-title">區域選擇</h2>
+        <p style="text-align: center; font-size: 14px">請點擊圓圈選擇座位</p>
+        <div class="seat-grid" id="seat-grid"></div>
+        <p
+          style="
+            font-size: 12px;
+            color: var(--danger);
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+          "
+          id="seat-warning"
+        >
+          ⚠️ 警告：若選定此位置，直到上餐完畢前，無法再更換位置。
+        </p>
+        <button class="btn" id="btn-confirm-seat" style="display: none">
+          確認並下一步
+        </button>
+        <button class="btn outline" onclick="showPage('p-zones')">
+          返回區域總覽
+        </button>
+      </div>
+
+      <!-- 頁面 5: 點餐 -->
+      <div id="p-menu" class="page">
+        <h2>餐點選擇</h2>
+        <p
+          style="
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 20px;
+          "
+        >
+          規則：任選兩杯飲品 或 一飲一餐
+        </p>
+        <h3>飲品 Drinks</h3>
+        <div id="menu-drinks"></div>
+        <h3>餐點 Food</h3>
+        <div id="menu-foods"></div>
+
+        <div style="margin-top: 30px; text-align: center">
+          <p>
+            目前選擇：<span id="select-count-drink">0</span> 飲 /
+            <span id="select-count-food">0</span> 餐
+          </p>
+          <button class="btn" onclick="submitOrder()">確認送出</button>
+          <button class="btn outline" onclick="showPage('p-seat')">
+            上一步 (重選座位)
+          </button>
+        </div>
+      </div>
+
+      <!-- 頁面 6: 完成 -->
+      <div id="p-done" class="page">
+        <div
+          style="
+            text-align: center;
+            margin-top: 50vh;
+            transform: translateY(-50%);
+          "
+        >
+          <h1 style="color: var(--accent-glow)">I 人夜店<br />歡迎您</h1>
+          <p style="line-height: 2">
+            謝謝今天的您出現在這裡<br />讓我們靜嗨一整夜吧
+          </p>
+          <br />
+          <p style="font-size: 12px; color: #666">
+            (請在座位上稍候，餐點將送至您的座位)
+          </p>
+        </div>
+      </div>
+
+      <!-- 後台管理頁面 -->
+      <div id="p-admin" class="page">
+        <h2>後台管理</h2>
+
+        <!-- 功能 1: 即時訂單 -->
+        <div
+          style="
+            background: #222;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+            "
+          >
+            <h3 style="margin-top: 0">即時訂單列表</h3>
+            <div style="display: flex; gap: 5px">
+              <button
+                id="filter-all"
+                class="stock-btn active"
+                onclick="filterOrders('all')"
+                style="font-size: 11px; padding: 4px 8px"
+              >
+                全部
+              </button>
+              <button
+                id="filter-pending"
+                class="stock-btn"
+                onclick="filterOrders('pending')"
+                style="font-size: 11px; padding: 4px 8px"
+              >
+                待出餐
+              </button>
+              <button
+                id="filter-served"
+                class="stock-btn"
+                onclick="filterOrders('served')"
+                style="font-size: 11px; padding: 4px 8px"
+              >
+                已出餐
+              </button>
+            </div>
+          </div>
+          <div
+            id="admin-orders"
+            style="max-height: 300px; overflow-y: auto"
+          ></div>
+        </div>
+
+        <!-- 功能 2: 餐點庫存 -->
+        <div
+          style="
+            background: #222;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+          "
+        >
+          <h3 style="margin-top: 0">餐點庫存管理</h3>
+          <p style="text-align: center; font-size: 12px; color: #aaa">
+            綠色=供應中 / 灰色=已售完
+          </p>
+          <div
+            id="admin-stock-list"
+            style="display: flex; flex-wrap: wrap; gap: 5px"
+          ></div>
+        </div>
+
+        <!-- 功能 3: 名單管理 -->
+        <div
+          style="
+            background: #222;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+          "
+        >
+          <h3 style="margin-top: 0">新增報到名單</h3>
+          <textarea
+            id="admin-names"
+            placeholder="輸入名字，一行一個"
+            style="
+              width: 100%;
+              height: 80px;
+              background: #333;
+              color: white;
+              border: 1px solid #444;
+              padding: 10px;
+              box-sizing: border-box;
+            "
+          ></textarea>
+          <button
+            class="btn"
+            onclick="adminAddUsers()"
+            style="margin-top: 5px; padding: 10px; font-size: 14px"
+          >
+            更新名單
+          </button>
+        </div>
+
+        <button
+          class="btn danger"
+          onclick="adminClearUsers()"
+          style="margin-bottom: 10px"
+        >
+          🔴 重置整個活動 (清空所有資料)
+        </button>
+        <button class="btn outline" onclick="logoutAdmin()">登出後台</button>
+      </div>
+    </div>
+
+    <!-- 引入 JavaScript -->
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

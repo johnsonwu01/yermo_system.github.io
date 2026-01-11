@@ -1,0 +1,379 @@
+:root {
+  --bg-color: #0f0f13;
+  --card-bg: #1a1a24;
+  --text-main: #e0e0e0;
+  --text-muted: #888;
+  --accent: #7b2cbf; /* 神秘紫 */
+  --accent-glow: #9d4edd;
+  --danger: #ef233c;
+  --success: #06d6a0;
+  --font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+#app {
+  width: 100%;
+  max-width: 480px; /* 手機版型 */
+  padding: 20px;
+  box-sizing: border-box;
+  position: relative;
+  padding-bottom: 60px; /* 預留底部空間 */
+}
+
+/* 頁面切換邏輯 */
+.page {
+  display: none;
+  animation: fadeIn 0.5s ease;
+}
+.page.active {
+  display: block;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 通用元件 */
+h1,
+h2,
+h3 {
+  font-weight: 300;
+  letter-spacing: 2px;
+  text-align: center;
+}
+h1 {
+  color: var(--accent-glow);
+  text-shadow: 0 0 10px rgba(123, 44, 191, 0.5);
+  margin-bottom: 30px;
+}
+
+.btn {
+  background: linear-gradient(135deg, var(--accent), #5a189a);
+  color: white;
+  border: none;
+  padding: 15px;
+  width: 100%;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: 0.3s;
+  letter-spacing: 1px;
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn.outline {
+  background: transparent;
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+}
+.btn.staff {
+  background: #333;
+  border: 1px dashed #555;
+  font-size: 14px;
+}
+.btn.danger {
+  background: var(--danger);
+}
+
+/* 列表樣式 */
+.list-item {
+  background: var(--card-bg);
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: 0.3s;
+  text-align: center;
+}
+.list-item:hover {
+  border-color: var(--accent);
+}
+
+/* 區域介紹卡片 */
+.zone-card {
+  background: var(--card-bg);
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  border-left: 4px solid var(--accent);
+}
+.zone-title {
+  font-size: 18px;
+  color: var(--accent-glow);
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+.zone-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+
+/* 座位選擇 */
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 20px;
+}
+.seat {
+  background: #333;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  border: 2px solid #444;
+  transition: 0.3s;
+}
+.seat.square {
+  border-radius: 8px;
+}
+.seat.selected {
+  background: var(--success);
+  border-color: var(--success);
+  color: #000;
+}
+.seat.taken {
+  background: #222;
+  border-color: #333;
+  color: #444;
+  pointer-events: none;
+  text-decoration: line-through;
+}
+.seat.taken::after {
+  content: "×";
+  position: absolute;
+  font-size: 20px;
+  color: #666;
+}
+
+/* 菜單樣式 */
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card-bg);
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  transition: 0.3s;
+}
+/* 售完樣式 */
+.menu-item.sold-out {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(1);
+  border: 1px solid #444;
+  position: relative;
+}
+.menu-item.sold-out::after {
+  content: "SOLD OUT";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-10deg);
+  border: 2px solid var(--danger);
+  color: var(--danger);
+  padding: 5px 10px;
+  font-weight: bold;
+  font-size: 18px;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.menu-controls button {
+  background: #444;
+  border: none;
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.menu-controls span {
+  margin: 0 10px;
+}
+.temp-switch {
+  font-size: 12px;
+  margin-right: 10px;
+  background: #222;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #888;
+  transition: 0.3s;
+}
+.temp-switch.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* 後台管理 */
+.staff-entry {
+  position: fixed;
+  bottom: 20px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  z-index: 100;
+}
+.staff-link {
+  color: #444;
+  text-decoration: none;
+  font-size: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.staff-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.order-row {
+  font-size: 12px;
+  border-bottom: 1px solid #333;
+  padding: 10px 0;
+}
+.order-row.done {
+  opacity: 0.6;
+  border-left: 3px solid var(--success);
+  padding-left: 10px;
+}
+.tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-right: 5px;
+}
+.tag.food {
+  background: #d35400;
+  color: white;
+}
+.tag.drink {
+  background: #2980b9;
+  color: white;
+}
+
+/* 後台開關 */
+.toggle-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid #333;
+  align-items: center;
+}
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  background: #555;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.toggle-switch.on {
+  background: var(--success);
+}
+.toggle-switch::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.toggle-switch.on::after {
+  left: 22px;
+}
+
+/* 庫存管理按鈕 */
+.stock-btn {
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  margin: 2px;
+  transition: 0.3s;
+}
+.stock-btn.active {
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(6, 214, 160, 0.1);
+}
+.stock-btn.out {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(239, 35, 60, 0.1);
+  text-decoration: line-through;
+}
+
+/* Loading */
+#loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  flex-direction: column;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #333;
+  border-top: 4px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 菜單區塊標題 */
+.menu-section-title {
+  font-size: 14px;
+  color: var(--accent);
+  margin: 20px 0 10px 0;
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}

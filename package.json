@@ -1,0 +1,24 @@
+{
+  "name": "i-night-api",
+  "version": "1.0.0",
+  "description": "I人夜店報到系統 API 服務器（使用 JSON 文件存儲）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "api",
+    "express",
+    "json"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
