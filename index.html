@@ -23,34 +23,46 @@
     <div id="password-modal" class="modal">
       <div class="modal-content">
         <h3 style="margin-top: 0; margin-bottom: 15px">請輸入管理員密碼</h3>
-        <input
-          type="password"
-          id="password-input"
-          placeholder="輸入密碼"
-          style="
-            width: 100%;
-            padding: 12px;
-            background: #333;
-            color: white;
-            border: 1px solid #444;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            box-sizing: border-box;
-            font-size: 16px;
-          "
-        />
-        <div style="display: flex; gap: 10px">
-          <button class="btn" id="password-submit" style="flex: 1; margin: 0">
-            確認
-          </button>
-          <button
-            class="btn outline"
-            id="password-cancel"
-            style="flex: 1; margin: 0"
-          >
-            取消
-          </button>
-        </div>
+        <form
+          id="password-form"
+          onsubmit="event.preventDefault(); document.getElementById('password-submit').click();"
+        >
+          <input
+            type="password"
+            id="password-input"
+            placeholder="輸入密碼"
+            autocomplete="current-password"
+            style="
+              width: 100%;
+              padding: 12px;
+              background: #333;
+              color: white;
+              border: 1px solid #444;
+              border-radius: 6px;
+              margin-bottom: 15px;
+              box-sizing: border-box;
+              font-size: 16px;
+            "
+          />
+          <div style="display: flex; gap: 10px">
+            <button
+              type="submit"
+              class="btn"
+              id="password-submit"
+              style="flex: 1; margin: 0"
+            >
+              確認
+            </button>
+            <button
+              type="button"
+              class="btn outline"
+              id="password-cancel"
+              style="flex: 1; margin: 0"
+            >
+              取消
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
