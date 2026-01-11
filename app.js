@@ -1545,7 +1545,7 @@ window.promptAdmin = () => {
   // 確認按鈕
   const handleSubmit = () => {
     const pwd = input.value.trim();
-    if (pwd === "13491349" || pwd === "123") {
+    if (pwd === "13491349") {
       modal.classList.remove("show");
       showPage("p-admin");
       loadAdminData();
