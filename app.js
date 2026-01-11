@@ -36,21 +36,36 @@ let menuStatus = {}; // 儲存餐點庫存狀態
 
 // 自定義提示框函數（替代 alert，適配平板）
 window.showToast = (message, type = "info", duration = 3000) => {
+  // 確保 DOM 已加載
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      showToast(message, type, duration);
+    });
+    return;
+  }
+
   const toast = document.getElementById("toast");
   const toastMessage = document.getElementById("toast-message");
 
   if (!toast || !toastMessage) {
     // 如果找不到元素，回退到 alert
+    console.warn("Toast 元素未找到，使用 alert 替代");
     alert(message);
     return;
+  }
+
+  // 清除之前的 timeout（如果有的話）
+  if (toast._timeout) {
+    clearTimeout(toast._timeout);
   }
 
   toastMessage.textContent = message;
   toast.className = `toast ${type}`;
   toast.classList.add("show");
 
-  setTimeout(() => {
+  toast._timeout = setTimeout(() => {
     toast.classList.remove("show");
+    toast._timeout = null;
   }, duration);
 };
 
@@ -1644,6 +1659,15 @@ setTimeout(() => {
     );
   }
 }, 100);
+
+// 確保 toast 在頁面加載後可用
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    console.log("DOM 加載完成，Toast 已準備就緒");
+  });
+} else {
+  console.log("DOM 已就緒，Toast 已準備就緒");
+}
 
 console.log("模組加載完成");
 console.log("使用 Firebase Realtime Database");
