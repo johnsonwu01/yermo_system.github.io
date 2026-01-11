@@ -34,6 +34,87 @@ let currentUser = null;
 let currentSeat = null;
 let menuStatus = {}; // 儲存餐點庫存狀態
 
+// 自定義提示框函數（替代 alert，適配平板）
+window.showToast = (message, type = "info", duration = 3000) => {
+  const toast = document.getElementById("toast");
+  const toastMessage = document.getElementById("toast-message");
+
+  if (!toast || !toastMessage) {
+    // 如果找不到元素，回退到 alert
+    alert(message);
+    return;
+  }
+
+  toastMessage.textContent = message;
+  toast.className = `toast ${type}`;
+  toast.classList.add("show");
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+  }, duration);
+};
+
+// 自定義確認對話框（替代 confirm，適配平板）
+window.showConfirm = (message, title = "確認") => {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirm-modal");
+    const titleEl = document.getElementById("confirm-title");
+    const messageEl = document.getElementById("confirm-message");
+    const okBtn = document.getElementById("confirm-ok");
+    const cancelBtn = document.getElementById("confirm-cancel");
+
+    if (!modal || !messageEl) {
+      // 回退到原生 confirm
+      const result = confirm(message);
+      resolve(result);
+      return;
+    }
+
+    // 設置內容
+    if (titleEl) titleEl.textContent = title;
+    messageEl.textContent = message;
+    modal.classList.add("show");
+
+    // 確認按鈕
+    const handleOk = () => {
+      modal.classList.remove("show");
+      resolve(true);
+      // 移除事件監聽器
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      modal.onclick = null;
+    };
+
+    // 取消按鈕
+    const handleCancel = () => {
+      modal.classList.remove("show");
+      resolve(false);
+      // 移除事件監聽器
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      modal.onclick = null;
+    };
+
+    // 添加事件監聽器
+    okBtn.onclick = handleOk;
+    cancelBtn.onclick = handleCancel;
+
+    // 點擊背景關閉（視為取消）
+    const handleModalClick = (e) => {
+      if (e.target === modal) {
+        handleCancel();
+      }
+    };
+    modal.onclick = handleModalClick;
+  });
+};
+
+// 兼容性：保留 alert 但使用自定義提示框
+const originalAlert = window.alert;
+window.alert = (message) => {
+  showToast(message, "info", 3000);
+};
+
 // 區域資料 (完全依照需求文字)
 const ZONES = [
   {
@@ -82,6 +163,33 @@ const MENU = {
 // 3. 頁面邏輯
 // --------------------------------------------------------
 
+// 更新用戶列表的函數（可重複使用）
+function updateUserList(users) {
+  const listDiv = document.getElementById("user-list");
+  if (!listDiv) return;
+
+  listDiv.innerHTML = "";
+
+  const sortedNames = Object.keys(users).sort();
+
+  if (sortedNames.length === 0) {
+    listDiv.innerHTML =
+      '<p style="text-align:center; color:#444;">(目前無待報到名單，請稍候)</p>';
+    return;
+  }
+
+  sortedNames.forEach((name) => {
+    const status = users[name].status || "waiting"; // waiting, paid, done
+    if (status === "waiting") {
+      const div = document.createElement("div");
+      div.className = "list-item";
+      div.textContent = name;
+      div.onclick = () => selectUser(name);
+      listDiv.appendChild(div);
+    }
+  });
+}
+
 // 初始化：監聽報到名單
 function startUsersPolling() {
   const usersRef = ref(db, "users");
@@ -93,29 +201,7 @@ function startUsersPolling() {
     }
 
     const users = snapshot.val() || {};
-    const listDiv = document.getElementById("user-list");
-    if (!listDiv) return;
-
-    listDiv.innerHTML = "";
-
-    const sortedNames = Object.keys(users).sort();
-
-    if (sortedNames.length === 0) {
-      listDiv.innerHTML =
-        '<p style="text-align:center; color:#444;">(目前無待報到名單，請稍候)</p>';
-      return;
-    }
-
-    sortedNames.forEach((name) => {
-      const status = users[name].status || "waiting"; // waiting, paid, done
-      if (status === "waiting") {
-        const div = document.createElement("div");
-        div.className = "list-item";
-        div.textContent = name;
-        div.onclick = () => selectUser(name);
-        listDiv.appendChild(div);
-      }
-    });
+    updateUserList(users);
   });
 }
 
@@ -134,12 +220,60 @@ function startMenuStatusPolling() {
   });
 }
 
+// 檢查維護模式
+function checkMaintenanceMode() {
+  const maintenanceRef = ref(db, "system/maintenance");
+  onValue(maintenanceRef, (snapshot) => {
+    const isMaintenance = snapshot.val() === true;
+    const maintenancePage = document.getElementById("p-maintenance");
+    const checkinPage = document.getElementById("p-checkin");
+    const adminPage = document.getElementById("p-admin");
+    const currentActivePage = document.querySelector(".page.active");
+
+    // 如果當前在後台頁面，不影響（後台可以正常操作）
+    if (adminPage && adminPage.classList.contains("active")) {
+      return;
+    }
+
+    // 如果當前在維護頁面，檢查是否需要退出
+    if (maintenancePage && maintenancePage.classList.contains("active")) {
+      if (!isMaintenance) {
+        // 退出維護模式，返回首頁
+        showPage("p-checkin");
+        // 確保用戶列表更新
+        setTimeout(() => {
+          const usersRef = ref(db, "users");
+          get(usersRef)
+            .then((snapshot) => {
+              const users = snapshot.val() || {};
+              updateUserList(users);
+            })
+            .catch((error) => {
+              console.error("獲取用戶列表失敗:", error);
+            });
+        }, 100);
+      }
+      return;
+    }
+
+    // 如果不在維護頁面，檢查是否需要進入維護模式
+    if (isMaintenance) {
+      // 進入維護模式
+      if (maintenancePage) {
+        showPage("p-maintenance");
+      }
+    }
+  });
+}
+
 // 啟動所有監聽
+checkMaintenanceMode();
 startUsersPolling();
 startMenuStatusPolling();
 
-window.selectUser = (name) => {
-  if (!confirm(`確認您是 ${name} 嗎？`)) return;
+window.selectUser = async (name) => {
+  const confirmed = await showConfirm(`確認您是 ${name} 嗎？`, "確認身份");
+  if (!confirmed) return;
   currentUser = name;
   showPage("p-payment");
 };
@@ -207,31 +341,180 @@ window.openZone = async (zoneId) => {
       const allSeats = snapshot.val() || {};
       grid.innerHTML = "";
 
-      for (let i = 1; i <= zone.seats; i++) {
-        const seatId = `${zoneId}-${i}`;
-        const btn = document.createElement("div");
-        btn.className = "seat";
-        btn.textContent = i;
+      // 第二區特殊排列：1 2 3 7 / 5 6 4 8
+      // 7、8是方的
+      if (zoneId === 2) {
+        const seatOrder = [1, 2, 3, 7, 5, 6, 4, 8];
+        seatOrder.forEach((seatNum) => {
+          const seatId = `${zoneId}-${seatNum}`;
+          const btn = document.createElement("div");
+          btn.className = "seat";
+          btn.textContent = seatNum;
 
-        // 第五區有圓桌有方桌的視覺區分 (前4圓, 後4方)
-        if (zoneId === 5 && i > 4) btn.classList.add("square");
-        else if (zone.type === "rect") btn.classList.add("square");
+          // 第二區：第7、8號座位是方的
+          if (seatNum === 7 || seatNum === 8) btn.classList.add("square");
 
-        if (
-          allSeats[seatId] &&
-          allSeats[seatId].takenBy &&
-          allSeats[seatId].takenBy !== currentUser
-        ) {
-          btn.classList.add("taken");
-          btn.title = "已有人";
-        } else {
-          btn.onclick = () => selectSeatTemp(seatId, btn);
+          if (
+            allSeats[seatId] &&
+            allSeats[seatId].takenBy &&
+            allSeats[seatId].takenBy !== currentUser
+          ) {
+            btn.classList.add("taken");
+            btn.title = "已有人";
+          } else {
+            btn.onclick = () => selectSeatTemp(seatId, btn);
+          }
+
+          // 保持當前選擇
+          if (currentSeat === seatId) btn.classList.add("selected");
+
+          grid.appendChild(btn);
+        });
+      } else if (zoneId === 3) {
+        // 第三區特殊排列：1 (空) 3 4 / 2 (空) 5 6
+        const seatOrder = [1, null, 3, 4, 2, null, 5, 6]; // null 表示空位
+        seatOrder.forEach((seatNum) => {
+          if (seatNum === null) {
+            // 添加空位
+            const emptyDiv = document.createElement("div");
+            emptyDiv.style.visibility = "hidden"; // 隱藏但佔位
+            grid.appendChild(emptyDiv);
+          } else {
+            const seatId = `${zoneId}-${seatNum}`;
+            const btn = document.createElement("div");
+            btn.className = "seat";
+            btn.textContent = seatNum;
+
+            // 第三區：第3、4、5、6號座位是方的
+            if (
+              seatNum === 3 ||
+              seatNum === 4 ||
+              seatNum === 5 ||
+              seatNum === 6
+            )
+              btn.classList.add("square");
+
+            if (
+              allSeats[seatId] &&
+              allSeats[seatId].takenBy &&
+              allSeats[seatId].takenBy !== currentUser
+            ) {
+              btn.classList.add("taken");
+              btn.title = "已有人";
+            } else {
+              btn.onclick = () => selectSeatTemp(seatId, btn);
+            }
+
+            // 保持當前選擇
+            if (currentSeat === seatId) btn.classList.add("selected");
+
+            grid.appendChild(btn);
+          }
+        });
+      } else if (zoneId === 4) {
+        // 第四區特殊排列：1 3 5 / 2 4 6
+        // 使用空位來實現3列佈局
+        const seatOrder = [1, 3, 5, null, 2, 4, 6, null]; // null 表示空位
+        seatOrder.forEach((seatNum) => {
+          if (seatNum === null) {
+            // 添加空位
+            const emptyDiv = document.createElement("div");
+            emptyDiv.style.visibility = "hidden"; // 隱藏但佔位
+            grid.appendChild(emptyDiv);
+          } else {
+            const seatId = `${zoneId}-${seatNum}`;
+            const btn = document.createElement("div");
+            btn.className = "seat";
+            btn.textContent = seatNum;
+
+            // 第四區：所有座位都是方的（rect類型）
+            btn.classList.add("square");
+
+            if (
+              allSeats[seatId] &&
+              allSeats[seatId].takenBy &&
+              allSeats[seatId].takenBy !== currentUser
+            ) {
+              btn.classList.add("taken");
+              btn.title = "已有人";
+            } else {
+              btn.onclick = () => selectSeatTemp(seatId, btn);
+            }
+
+            // 保持當前選擇
+            if (currentSeat === seatId) btn.classList.add("selected");
+
+            grid.appendChild(btn);
+          }
+        });
+      } else if (zoneId === 5) {
+        // 第五區特殊排列：x x 5 6 / 3 4 7 x
+        // 5、6、7是方的，3、4是圓的
+        const seatOrder = [1, 2, 5, 6, 3, 4, 7, 8]; // null 表示空位
+        seatOrder.forEach((seatNum) => {
+          if (seatNum === null) {
+            // 添加空位
+            const emptyDiv = document.createElement("div");
+            emptyDiv.style.visibility = "hidden"; // 隱藏但佔位
+            grid.appendChild(emptyDiv);
+          } else {
+            const seatId = `${zoneId}-${seatNum}`;
+            const btn = document.createElement("div");
+            btn.className = "seat";
+            btn.textContent = seatNum;
+
+            // 第五區：第5、6、7號座位是方的，第3、4號是圓的
+            if (
+              seatNum === 5 ||
+              seatNum === 6 ||
+              seatNum === 7 ||
+              seatNum === 8
+            )
+              btn.classList.add("square");
+
+            if (
+              allSeats[seatId] &&
+              allSeats[seatId].takenBy &&
+              allSeats[seatId].takenBy !== currentUser
+            ) {
+              btn.classList.add("taken");
+              btn.title = "已有人";
+            } else {
+              btn.onclick = () => selectSeatTemp(seatId, btn);
+            }
+
+            // 保持當前選擇
+            if (currentSeat === seatId) btn.classList.add("selected");
+
+            grid.appendChild(btn);
+          }
+        });
+      } else {
+        // 其他區域正常排列
+        for (let i = 1; i <= zone.seats; i++) {
+          const seatId = `${zoneId}-${i}`;
+          const btn = document.createElement("div");
+          btn.className = "seat";
+          btn.textContent = i;
+
+          if (zone.type === "rect") btn.classList.add("square");
+
+          if (
+            allSeats[seatId] &&
+            allSeats[seatId].takenBy &&
+            allSeats[seatId].takenBy !== currentUser
+          ) {
+            btn.classList.add("taken");
+            btn.title = "已有人";
+          } else {
+            btn.onclick = () => selectSeatTemp(seatId, btn);
+          }
+
+          // 保持當前選擇
+          if (currentSeat === seatId) btn.classList.add("selected");
+
+          grid.appendChild(btn);
         }
-
-        // 保持當前選擇
-        if (currentSeat === seatId) btn.classList.add("selected");
-
-        grid.appendChild(btn);
       }
     },
     { onlyOnce: true }
@@ -270,10 +553,50 @@ document.getElementById("btn-confirm-seat").onclick = async () => {
       return;
     }
 
-    // 鎖定座位
+    // 如果是換位置（已有舊座位），先釋放舊座位
+    const userRef = ref(db, "users/" + currentUser);
+    const userSnapshot = await get(userRef);
+    if (userSnapshot.exists() && userSnapshot.val().seat) {
+      const oldSeat = userSnapshot.val().seat;
+      if (oldSeat && oldSeat !== currentSeat) {
+        // 檢查舊座位是否仍屬於當前用戶
+        const oldSeatRef = ref(db, "seats/" + oldSeat);
+        const oldSeatSnapshot = await get(oldSeatRef);
+        if (
+          oldSeatSnapshot.exists() &&
+          oldSeatSnapshot.val().takenBy === currentUser
+        ) {
+          // 釋放舊座位
+          await set(oldSeatRef, { takenBy: null });
+        }
+      }
+    }
+
+    // 鎖定新座位
     await set(seatRef, { takenBy: currentUser });
     await update(ref(db, "users/" + currentUser), { seat: currentSeat });
 
+    // 檢查訂單狀態
+    const orderRef = ref(db, "orders/" + currentUser);
+    const orderSnapshot = await get(orderRef);
+
+    if (orderSnapshot.exists()) {
+      // 如果已有訂單，更新座位信息
+      await update(orderRef, { seat: currentSeat });
+
+      // 檢查是否已出餐
+      const orderData = orderSnapshot.val();
+      const isServed = orderData.served === true;
+
+      if (isServed) {
+        // 已出餐，只能換位置，不進入點餐頁面
+        alert("位置已更新！您已出餐完成，無法再次點餐。");
+        showPage("p-done");
+        return;
+      }
+    }
+
+    // 未出餐或沒有訂單，進入點餐頁面
     renderMenu();
     showPage("p-menu");
   } catch (error) {
@@ -477,19 +800,150 @@ window.submitOrder = async () => {
   }
 };
 
+// 檢查訂單狀態並允許換位置（需已出餐）
+window.checkAndGoToZones = async () => {
+  if (!currentUser) {
+    alert("請先完成報到");
+    showPage("p-checkin");
+    return;
+  }
+
+  try {
+    // 檢查用戶狀態
+    const userRef = ref(db, "users/" + currentUser);
+    const userSnapshot = await get(userRef);
+
+    if (!userSnapshot.exists()) {
+      alert("找不到用戶資料");
+      showPage("p-checkin");
+      return;
+    }
+
+    const userData = userSnapshot.val();
+    const userStatus = userData.status || "waiting";
+
+    // 如果用戶已付款但沒有訂單，允許繼續完成流程
+    const orderRef = ref(db, "orders/" + currentUser);
+    const orderSnapshot = await get(orderRef);
+
+    if (userStatus === "paid" && !orderSnapshot.exists()) {
+      // 已付款但未完成點餐，允許繼續選擇座位和點餐
+      if (userData.seat) {
+        currentSeat = userData.seat;
+      }
+      showPage("p-zones");
+      return;
+    }
+
+    // 如果有訂單，檢查是否已出餐
+    if (!orderSnapshot.exists()) {
+      alert("您尚未完成點餐，無法更換位置");
+      return;
+    }
+
+    const orderData = orderSnapshot.val();
+    const isServed = orderData.served === true;
+
+    if (!isServed) {
+      alert("請等待餐點出餐完成後，才能更換位置");
+      return;
+    }
+
+    // 已出餐，允許進入區域選擇頁面
+    if (orderData.seat) {
+      currentSeat = orderData.seat;
+    }
+    showPage("p-zones");
+  } catch (error) {
+    console.error("檢查訂單狀態失敗:", error);
+    alert("檢查訂單狀態時發生錯誤，請稍後再試");
+  }
+};
+
+// 在首頁輸入名稱並檢查訂單狀態後進入位置表（需已出餐）
+window.checkNameAndGoToZones = async () => {
+  const nameInput = document.getElementById("check-seat-name");
+  if (!nameInput) {
+    alert("找不到輸入框");
+    return;
+  }
+
+  const inputName = nameInput.value.trim();
+  if (!inputName) {
+    alert("請輸入您的報到名稱");
+    nameInput.focus();
+    return;
+  }
+
+  try {
+    // 檢查用戶是否存在
+    const userRef = ref(db, "users/" + inputName);
+    const userSnapshot = await get(userRef);
+
+    if (!userSnapshot.exists()) {
+      alert("找不到此報到名稱，請確認名稱是否正確");
+      nameInput.focus();
+      return;
+    }
+
+    const userData = userSnapshot.val();
+    const userStatus = userData.status || "waiting";
+
+    // 檢查訂單是否存在
+    const orderRef = ref(db, "orders/" + inputName);
+    const orderSnapshot = await get(orderRef);
+
+    // 如果用戶已付款但沒有訂單，允許繼續完成流程（選擇座位和點餐）
+    if (userStatus === "paid" && !orderSnapshot.exists()) {
+      currentUser = inputName;
+      if (userData.seat) {
+        currentSeat = userData.seat;
+      }
+      nameInput.value = ""; // 清空輸入框
+      showPage("p-zones");
+      return;
+    }
+
+    // 如果有訂單，檢查是否已出餐（換位置的情況）
+    if (orderSnapshot.exists()) {
+      const orderData = orderSnapshot.val();
+      const isServed = orderData.served === true;
+
+      if (!isServed) {
+        alert("請等待餐點出餐完成後，才能查看位置表");
+        nameInput.focus();
+        return;
+      }
+
+      // 已出餐，設置為當前用戶並進入區域選擇頁面
+      currentUser = inputName;
+      if (orderData.seat) {
+        currentSeat = orderData.seat;
+      }
+      nameInput.value = ""; // 清空輸入框
+      showPage("p-zones");
+      return;
+    }
+
+    // 如果用戶狀態是 waiting，提示先完成報到
+    if (userStatus === "waiting") {
+      alert("請先完成報到和付款流程");
+      nameInput.focus();
+      return;
+    }
+
+    // 其他情況，提示無法查看
+    alert("您尚未完成點餐，無法查看位置表");
+    nameInput.focus();
+  } catch (error) {
+    console.error("檢查訂單狀態失敗:", error);
+    alert("檢查訂單狀態時發生錯誤，請稍後再試");
+  }
+};
+
 // --------------------------------------------------------
 // 4. 後台邏輯
 // --------------------------------------------------------
-window.promptAdmin = () => {
-  const pwd = prompt("請輸入管理員密碼");
-  if (pwd === "13491349" || pwd === "123") {
-    showPage("p-admin");
-    loadAdminData();
-    renderAdminStock();
-  } else if (pwd !== null) {
-    alert("密碼錯誤");
-  }
-};
 
 // 新增名單
 window.adminAddUsers = async () => {
@@ -559,11 +1013,11 @@ window.adminAddUsers = async () => {
 };
 
 window.adminClearUsers = async () => {
-  if (
-    confirm(
-      "警告：確定要清空所有資料嗎？\n這會刪除所有訂單、座位狀態和報到名單。"
-    )
-  ) {
+  const confirmed = await showConfirm(
+    "警告：確定要清空所有資料嗎？\n這會刪除所有訂單、座位狀態和報到名單。",
+    "確認重置"
+  );
+  if (confirmed) {
     try {
       await set(ref(db, "users"), null);
       await set(ref(db, "seats"), null);
@@ -673,9 +1127,24 @@ function loadAdminData() {
                 </div>
                 <div style="font-size:11px; color:#888; margin-bottom:5px;">座位: ${
                   data.seat
+                    ? data.seatReleased
+                      ? `已離座`
+                      : data.seat
+                    : "未選座"
                 }</div>
                 <div style="margin-bottom:8px;">${itemStr}</div>
-                <div style="text-align:right;">
+                <div style="text-align:right; display:flex; gap:5px; justify-content:flex-end;">
+                    ${
+                      data.seat && !data.seatReleased
+                        ? `<button 
+                            class="btn outline" 
+                            onclick="releaseSeat('${user}', '${data.seat}')"
+                            style="margin:0; padding:6px 12px; font-size:11px; background:#ffb800; color:#000; border-color:#ffb800;"
+                          >
+                            🪑 離座
+                          </button>`
+                        : ""
+                    }
                     ${
                       !isServed
                         ? `<button 
@@ -699,6 +1168,181 @@ function loadAdminData() {
     });
   });
 }
+
+// 離座：釋放座位讓其他人可以選擇
+window.releaseSeat = async (userId, seatId) => {
+  const confirmed = await showConfirm(
+    `確定要讓 ${userId} 離座嗎？\n座位 ${seatId} 將被釋放，其他人可以選擇。`,
+    "確認離座"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    // 釋放座位
+    const seatRef = ref(db, "seats/" + seatId);
+    await set(seatRef, { takenBy: null });
+
+    // 清除用戶資料中的座位信息
+    const userRef = ref(db, "users/" + userId);
+    const userSnapshot = await get(userRef);
+    if (userSnapshot.exists()) {
+      await update(userRef, { seat: null });
+    }
+
+    // 更新訂單中的座位信息（保留原座位信息，但標記為已離座）
+    const orderRef = ref(db, "orders/" + userId);
+    const orderSnapshot = await get(orderRef);
+    if (orderSnapshot.exists()) {
+      // 保留原座位信息，添加離座標記
+      await update(orderRef, { seatReleased: true });
+    }
+
+    showToast("座位已釋放", "success");
+    // 立即更新訂單列表
+    loadAdminData();
+  } catch (error) {
+    console.error("釋放座位失敗:", error);
+    showToast(
+      "釋放座位失敗: " + (error.message || "請檢查 Firebase 權限設定"),
+      "error"
+    );
+  }
+};
+
+// 匯出所有訂單到 Excel
+window.exportOrdersToExcel = async () => {
+  try {
+    showToast("正在匯出訂單資料...", "info", 2000);
+
+    // 獲取所有訂單
+    const ordersRef = ref(db, "orders");
+    const ordersSnapshot = await get(ordersRef);
+    const orders = ordersSnapshot.val() || {};
+
+    // 獲取所有用戶資料（用於補充信息）
+    const usersRef = ref(db, "users");
+    const usersSnapshot = await get(usersRef);
+    const users = usersSnapshot.val() || {};
+
+    // 準備 Excel 數據
+    const excelData = [];
+
+    // 表頭
+    excelData.push([
+      "用戶名稱",
+      "座位",
+      "離座狀態",
+      "訂單時間",
+      "出餐狀態",
+      "出餐時間",
+      "飲品項目",
+      "餐點項目",
+      "總飲品數",
+      "總餐點數",
+    ]);
+
+    // 處理每個訂單
+    Object.entries(orders).forEach(([userId, orderData]) => {
+      const userData = users[userId] || {};
+
+      // 處理訂單項目
+      const drinks = [];
+      const foods = [];
+      let drinkCount = 0;
+      let foodCount = 0;
+
+      if (orderData.items && Array.isArray(orderData.items)) {
+        orderData.items.forEach((item) => {
+          const itemName = item.name || "";
+          const tempStr =
+            item.temp === "ice" ? "[冰]" : item.temp === "hot" ? "[熱]" : "";
+          const itemText = `${itemName} ${tempStr} x${item.count || 1}`;
+
+          if (item.type === "drink") {
+            drinks.push(itemText);
+            drinkCount += item.count || 1;
+          } else if (item.type === "food") {
+            foods.push(itemText);
+            foodCount += item.count || 1;
+          }
+        });
+      }
+
+      // 格式化時間
+      const orderTime = orderData.timestamp
+        ? new Date(orderData.timestamp).toLocaleString("zh-TW")
+        : "";
+      const servedTime = orderData.servedAt
+        ? new Date(orderData.servedAt).toLocaleString("zh-TW")
+        : "";
+
+      // 座位狀態
+      const seatStatus = orderData.seatReleased
+        ? "已離座"
+        : orderData.seat
+        ? "在座"
+        : "未選座";
+
+      // 出餐狀態
+      const servedStatus = orderData.served ? "已出餐" : "待出餐";
+
+      // 添加行數據
+      excelData.push([
+        userId,
+        orderData.seat || "未選座",
+        seatStatus,
+        orderTime,
+        servedStatus,
+        servedTime || "",
+        drinks.join("; "),
+        foods.join("; "),
+        drinkCount,
+        foodCount,
+      ]);
+    });
+
+    // 創建工作簿
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+    // 設置列寬
+    ws["!cols"] = [
+      { wch: 15 }, // 用戶名稱
+      { wch: 12 }, // 座位
+      { wch: 10 }, // 離座狀態
+      { wch: 20 }, // 訂單時間
+      { wch: 10 }, // 出餐狀態
+      { wch: 20 }, // 出餐時間
+      { wch: 40 }, // 飲品項目
+      { wch: 30 }, // 餐點項目
+      { wch: 12 }, // 總飲品數
+      { wch: 12 }, // 總餐點數
+    ];
+
+    // 添加工作表
+    XLSX.utils.book_append_sheet(wb, ws, "訂單列表");
+
+    // 生成文件名（包含當前日期時間）
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const timeStr = now.toTimeString().slice(0, 5).replace(/:/g, "");
+    const fileName = `I人夜店訂單_${dateStr}_${timeStr}.xlsx`;
+
+    // 下載文件
+    XLSX.writeFile(wb, fileName);
+
+    showToast(`成功匯出 ${Object.keys(orders).length} 筆訂單`, "success");
+  } catch (error) {
+    console.error("匯出失敗:", error);
+    showToast(
+      "匯出失敗: " + (error.message || "請檢查 Firebase 權限設定"),
+      "error"
+    );
+  }
+};
 
 // 標記訂單為已出餐/取消標記
 window.markOrderServed = async (userId, served) => {
@@ -758,6 +1402,157 @@ function renderAdminStock() {
 
 window.logoutAdmin = () => {
   showPage("p-checkin");
+  // 手動觸發一次用戶列表更新，確保登出後立即顯示最新名單
+  setTimeout(() => {
+    const usersRef = ref(db, "users");
+    get(usersRef)
+      .then((snapshot) => {
+        const users = snapshot.val() || {};
+        updateUserList(users);
+      })
+      .catch((error) => {
+        console.error("獲取用戶列表失敗:", error);
+      });
+  }, 100);
+};
+
+// 切換維護模式
+window.toggleMaintenance = async () => {
+  const toggle = document.getElementById("maintenance-toggle");
+  const statusText = document.getElementById("maintenance-status");
+  const slider = document.getElementById("maintenance-slider");
+  const sliderThumb = document.getElementById("maintenance-slider-thumb");
+
+  if (!toggle) return;
+
+  const isMaintenance = toggle.checked;
+
+  try {
+    await set(ref(db, "system/maintenance"), isMaintenance);
+
+    // 更新 UI
+    if (statusText) {
+      statusText.textContent = isMaintenance
+        ? "狀態：前台已關閉（顯示休息中）"
+        : "狀態：前台正常運作";
+      statusText.style.color = isMaintenance ? "#ef233c" : "#888";
+    }
+
+    if (slider) {
+      slider.style.backgroundColor = isMaintenance ? "#ef233c" : "#06d6a0";
+    }
+
+    if (sliderThumb) {
+      sliderThumb.style.transform = isMaintenance
+        ? "translateX(30px)"
+        : "translateX(0)";
+    }
+  } catch (error) {
+    console.error("切換維護模式失敗:", error);
+    alert("切換失敗: " + (error.message || "請檢查 Firebase 權限設定"));
+    // 恢復開關狀態
+    toggle.checked = !isMaintenance;
+  }
+};
+
+// 初始化維護模式開關狀態
+function initMaintenanceToggle() {
+  const maintenanceRef = ref(db, "system/maintenance");
+  onValue(maintenanceRef, (snapshot) => {
+    const isMaintenance = snapshot.val() === true;
+    const toggle = document.getElementById("maintenance-toggle");
+    const statusText = document.getElementById("maintenance-status");
+    const slider = document.getElementById("maintenance-slider");
+    const sliderThumb = document.getElementById("maintenance-slider-thumb");
+
+    if (toggle) {
+      toggle.checked = isMaintenance;
+    }
+
+    if (statusText) {
+      statusText.textContent = isMaintenance
+        ? "狀態：前台已關閉（顯示休息中）"
+        : "狀態：前台正常運作";
+      statusText.style.color = isMaintenance ? "#ef233c" : "#888";
+    }
+
+    if (slider) {
+      slider.style.backgroundColor = isMaintenance ? "#ef233c" : "#06d6a0";
+    }
+
+    if (sliderThumb) {
+      sliderThumb.style.transform = isMaintenance
+        ? "translateX(30px)"
+        : "translateX(0)";
+    }
+  });
+}
+
+// 當進入後台頁面時初始化開關
+window.promptAdmin = () => {
+  const modal = document.getElementById("password-modal");
+  const input = document.getElementById("password-input");
+  const submitBtn = document.getElementById("password-submit");
+  const cancelBtn = document.getElementById("password-cancel");
+
+  if (!modal || !input) {
+    // 回退到原生 prompt
+    const pwd = prompt("請輸入管理員密碼");
+    if (pwd === "13491349" || pwd === "123") {
+      showPage("p-admin");
+      loadAdminData();
+      renderAdminStock();
+      initMaintenanceToggle();
+    } else if (pwd !== null) {
+      alert("密碼錯誤");
+    }
+    return;
+  }
+
+  // 顯示 modal
+  modal.classList.add("show");
+  input.value = "";
+  input.focus();
+
+  // 確認按鈕
+  const handleSubmit = () => {
+    const pwd = input.value.trim();
+    if (pwd === "13491349" || pwd === "123") {
+      modal.classList.remove("show");
+      showPage("p-admin");
+      loadAdminData();
+      renderAdminStock();
+      initMaintenanceToggle();
+    } else if (pwd !== "") {
+      showToast("密碼錯誤", "error");
+      input.value = "";
+      input.focus();
+    }
+  };
+
+  // 取消按鈕
+  const handleCancel = () => {
+    modal.classList.remove("show");
+  };
+
+  // 添加事件監聽器
+  submitBtn.onclick = handleSubmit;
+  cancelBtn.onclick = handleCancel;
+
+  // 按 Enter 鍵提交
+  input.onkeypress = (e) => {
+    if (e.key === "Enter") {
+      handleSubmit();
+    }
+  };
+
+  // 點擊背景關閉
+  const handleModalClick = (e) => {
+    if (e.target === modal) {
+      handleCancel();
+    }
+  };
+  modal.onclick = handleModalClick;
 };
 
 window.showPage = (id) => {
@@ -778,6 +1573,35 @@ window.showPage = (id) => {
 
   // 滾動到頂部
   window.scrollTo(0, 0);
+
+  // 如果切換到報到頁面，檢查維護模式狀態
+  if (id === "p-checkin") {
+    const maintenanceRef = ref(db, "system/maintenance");
+    get(maintenanceRef)
+      .then((snapshot) => {
+        const isMaintenance = snapshot.val() === true;
+        if (isMaintenance) {
+          // 如果維護模式開啟，切換到維護頁面
+          showPage("p-maintenance");
+        } else {
+          // 如果維護模式關閉，確保顯示報到頁面並更新用戶列表
+          setTimeout(() => {
+            const usersRef = ref(db, "users");
+            get(usersRef)
+              .then((snapshot) => {
+                const users = snapshot.val() || {};
+                updateUserList(users);
+              })
+              .catch((error) => {
+                console.error("獲取用戶列表失敗:", error);
+              });
+          }, 100);
+        }
+      })
+      .catch((error) => {
+        console.error("檢查維護模式失敗:", error);
+      });
+  }
 
   console.log(`切換到頁面: ${id}`);
 };

@@ -6,9 +6,78 @@
     <title>I人夜店 | Introvert's Night</title>
     <!-- 引入自訂樣式 -->
     <link rel="stylesheet" href="styles.css" />
+    <!-- SheetJS 用於匯出 Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   </head>
   <body>
     <div id="loading"><div class="spinner"></div></div>
+
+    <!-- 自定義提示框 -->
+    <div id="toast" class="toast">
+      <div class="toast-content">
+        <span id="toast-message"></span>
+      </div>
+    </div>
+
+    <!-- 自定義密碼輸入框 -->
+    <div id="password-modal" class="modal">
+      <div class="modal-content">
+        <h3 style="margin-top: 0; margin-bottom: 15px">請輸入管理員密碼</h3>
+        <input
+          type="password"
+          id="password-input"
+          placeholder="輸入密碼"
+          style="
+            width: 100%;
+            padding: 12px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            font-size: 16px;
+          "
+        />
+        <div style="display: flex; gap: 10px">
+          <button class="btn" id="password-submit" style="flex: 1; margin: 0">
+            確認
+          </button>
+          <button
+            class="btn outline"
+            id="password-cancel"
+            style="flex: 1; margin: 0"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 自定義確認對話框 -->
+    <div id="confirm-modal" class="modal">
+      <div class="modal-content">
+        <h3 style="margin-top: 0; margin-bottom: 15px" id="confirm-title">
+          確認
+        </h3>
+        <p
+          id="confirm-message"
+          style="margin-bottom: 20px; line-height: 1.6"
+        ></p>
+        <div style="display: flex; gap: 10px">
+          <button class="btn" id="confirm-ok" style="flex: 1; margin: 0">
+            確認
+          </button>
+          <button
+            class="btn outline"
+            id="confirm-cancel"
+            style="flex: 1; margin: 0"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div id="app">
       <!-- 頁面 1: 報到 -->
@@ -22,6 +91,52 @@
           請選擇您的報到名稱
         </p>
         <div id="user-list"></div>
+
+        <!-- 查看位置表功能 -->
+        <div
+          style="
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid #333;
+          "
+        >
+          <p
+            style="
+              text-align: center;
+              font-size: 12px;
+              color: #888;
+              margin-bottom: 15px;
+            "
+          >
+            已報到？輸入名稱查看位置表
+          </p>
+          <input
+            type="text"
+            id="check-seat-name"
+            placeholder="輸入您的報到名稱"
+            onkeypress="if(event.key === 'Enter') checkNameAndGoToZones()"
+            style="
+              width: 100%;
+              padding: 12px;
+              background: #333;
+              color: white;
+              border: 1px solid #444;
+              border-radius: 6px;
+              margin-bottom: 10px;
+              box-sizing: border-box;
+              font-size: 14px;
+            "
+          />
+          <button
+            class="btn outline"
+            onclick="checkNameAndGoToZones()"
+            style="width: 100%; padding: 12px; font-size: 14px"
+          >
+            查看位置表
+          </button>
+        </div>
 
         <!-- 明顯的 Staff 入口 -->
         <div class="staff-entry">
@@ -43,25 +158,13 @@
           "
         >
           <p>門票費用：<strong>$350</strong></p>
-          <p style="font-size: 12px; color: #666">請掃描 LinePay 或支付現金</p>
-          <div
-            style="
-              width: 150px;
-              height: 150px;
-              background: #eee;
-              margin: 0 auto;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #aaa;
-            "
-          >
-            QR CODE
-          </div>
+          <p style="font-size: 12px; color: #666">
+            請至櫃台掃描 LinePay 或支付現金
+          </p>
         </div>
-        <p style="text-align: center; font-size: 12px; color: #888">
+        <!-- <p style="text-align: center; font-size: 12px; color: #888">
           請向工作人員出示此畫面<br />確認支付完成
-        </p>
+        </p> -->
         <button class="btn staff" id="btn-staff-confirm">
           【工作人員點擊】支付完成
         </button>
@@ -158,12 +261,126 @@
           <p style="font-size: 12px; color: #666">
             (請在座位上稍候，餐點將送至您的座位)
           </p>
+          <br />
+          <button class="btn outline" onclick="checkAndGoToZones()">
+            重回座位區
+          </button>
+        </div>
+      </div>
+
+      <!-- 休息中頁面 -->
+      <div id="p-maintenance" class="page">
+        <div
+          style="
+            text-align: center;
+            margin-top: 50vh;
+            transform: translateY(-50%);
+          "
+        >
+          <h1 style="color: var(--accent-glow); font-size: 48px">
+            I 人夜店<br />休息中
+          </h1>
+        </div>
+
+        <!-- Staff 入口 -->
+        <div class="staff-entry">
+          <span class="staff-link" onclick="promptAdmin()">Staff Only</span>
         </div>
       </div>
 
       <!-- 後台管理頁面 -->
       <div id="p-admin" class="page">
         <h2>後台管理</h2>
+
+        <!-- 功能 0: 前台開關 -->
+        <div
+          style="
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <div style="text-align: left; flex: 1">
+              <h3 style="margin-top: 0; margin-bottom: 5px; text-align: left">
+                前台開關
+              </h3>
+              <p
+                style="
+                  font-size: 12px;
+                  color: #aaa;
+                  margin: 0;
+                  text-align: left;
+                "
+              >
+                關閉前台時，訪客將看到「休息中」頁面
+              </p>
+            </div>
+            <label
+              style="
+                position: relative;
+                display: inline-block;
+                width: 60px;
+                height: 30px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="checkbox"
+                id="maintenance-toggle"
+                onchange="toggleMaintenance()"
+                style="opacity: 0; width: 0; height: 0"
+              />
+              <span
+                id="maintenance-slider"
+                style="
+                  position: absolute;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  bottom: 0;
+                  background-color: #444;
+                  border-radius: 30px;
+                  transition: 0.3s;
+                "
+              >
+                <span
+                  id="maintenance-slider-thumb"
+                  style="
+                    position: absolute;
+                    content: '';
+                    height: 24px;
+                    width: 24px;
+                    left: 3px;
+                    bottom: 3px;
+                    background-color: white;
+                    border-radius: 50%;
+                    transition: 0.3s;
+                  "
+                ></span>
+              </span>
+            </label>
+          </div>
+          <p
+            id="maintenance-status"
+            style="
+              text-align: center;
+              font-size: 12px;
+              color: #888;
+              margin-top: 10px;
+              margin-bottom: 0;
+            "
+          >
+            狀態：前台正常運作
+          </p>
+        </div>
 
         <!-- 功能 1: 即時訂單 -->
         <div
@@ -183,7 +400,7 @@
             "
           >
             <h3 style="margin-top: 0">即時訂單列表</h3>
-            <div style="display: flex; gap: 5px">
+            <div style="display: flex; gap: 5px; align-items: center">
               <button
                 id="filter-all"
                 class="stock-btn active"
@@ -267,13 +484,22 @@
           </button>
         </div>
 
-        <button
-          class="btn danger"
-          onclick="adminClearUsers()"
-          style="margin-bottom: 10px"
-        >
-          🔴 重置整個活動 (清空所有資料)
-        </button>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px">
+          <button
+            class="btn"
+            onclick="exportOrdersToExcel()"
+            style="flex: 1; padding: 10px; font-size: 14px"
+          >
+            📊 匯出 Excel
+          </button>
+          <button
+            class="btn danger"
+            onclick="adminClearUsers()"
+            style="flex: 1; padding: 10px; font-size: 14px"
+          >
+            🔴 重置整個活動
+          </button>
+        </div>
         <button class="btn outline" onclick="logoutAdmin()">登出後台</button>
       </div>
     </div>
