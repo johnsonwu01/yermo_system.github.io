@@ -1526,7 +1526,7 @@ window.promptAdmin = () => {
   if (!modal || !input) {
     // 回退到原生 prompt
     const pwd = prompt("請輸入管理員密碼");
-    if (pwd === "13491349" || pwd === "123") {
+    if (pwd === "13491349") {
       showPage("p-admin");
       loadAdminData();
       renderAdminStock();
