@@ -1,130 +1,31 @@
 // --------------------------------------------------------
-// 1. API 配置（使用本地後端 API，無需 Firebase）
+// 1. FIREBASE CONFIG
 // --------------------------------------------------------
-// 自動偵測當前網址（部署時會自動適配）
-const API_BASE_URL = window.location.origin;
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getDatabase,
+  ref,
+  onValue,
+  set,
+  update,
+  get,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// API 調用函數
-const api = {
-  // 獲取用戶列表
-  async getUsers() {
-    const response = await fetch(`${API_BASE_URL}/api/users`);
-    return await response.json();
-  },
-
-  // 更新用戶（批量）
-  async updateUsers(updates) {
-    const response = await fetch(`${API_BASE_URL}/api/users`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    return await response.json();
-  },
-
-  // 更新單個用戶
-  async updateUser(userId, updates) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/users/${encodeURIComponent(userId)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      }
-    );
-    return await response.json();
-  },
-
-  // 獲取座位
-  async getSeats() {
-    const response = await fetch(`${API_BASE_URL}/api/seats`);
-    return await response.json();
-  },
-
-  // 更新座位
-  async updateSeat(seatId, data) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/seats/${encodeURIComponent(seatId)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }
-    );
-    return await response.json();
-  },
-
-  // 獲取訂單
-  async getOrders() {
-    const response = await fetch(`${API_BASE_URL}/api/orders`);
-    return await response.json();
-  },
-
-  // 創建訂單
-  async createOrder(userId, orderData) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/orders/${encodeURIComponent(userId)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData),
-      }
-    );
-    return await response.json();
-  },
-
-  // 獲取菜單狀態
-  async getMenuStatus() {
-    const response = await fetch(`${API_BASE_URL}/api/menu_status`);
-    return await response.json();
-  },
-
-  // 更新菜單狀態
-  async updateMenuStatus(updates) {
-    const response = await fetch(`${API_BASE_URL}/api/menu_status`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    return await response.json();
-  },
-
-  // 重置數據
-  async resetData() {
-    const response = await fetch(`${API_BASE_URL}/api/reset`, {
-      method: "DELETE",
-    });
-    return await response.json();
-  },
-
-  // 更新訂單狀態（標記出餐完成）
-  async updateOrderStatus(userId, served) {
-    const response = await fetch(
-      `${API_BASE_URL}/api/orders/${encodeURIComponent(userId)}/status`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ served }),
-      }
-    );
-
-    // 檢查響應狀態
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        throw new Error(
-          `HTTP ${response.status}: ${errorText.substring(0, 100)}`
-        );
-      }
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  },
+// Firebase 配置
+const firebaseConfig = {
+  apiKey: "AIzaSyC856BX7Sl6iHyjDIyOwe4nh5Q1Pea-tvk",
+  authDomain: "yermo-acf82.firebaseapp.com",
+  databaseURL:
+    "https://yermo-acf82-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "yermo-acf82",
+  storageBucket: "yermo-acf82.firebasestorage.app",
+  messagingSenderId: "802358752702",
+  appId: "1:802358752702:web:192c3e5f7f6a9f7f8e35ef",
+  measurementId: "G-47QMRFYW7C",
 };
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
 // --------------------------------------------------------
 // 2. 資料結構與全域變數
@@ -132,7 +33,6 @@ const api = {
 let currentUser = null;
 let currentSeat = null;
 let menuStatus = {}; // 儲存餐點庫存狀態
-let pollIntervals = {}; // 儲存輪詢定時器
 
 // 區域資料 (完全依照需求文字)
 const ZONES = [
@@ -182,74 +82,59 @@ const MENU = {
 // 3. 頁面邏輯
 // --------------------------------------------------------
 
-// 初始化：監聽報到名單（使用輪詢模擬實時更新）
+// 初始化：監聽報到名單
 function startUsersPolling() {
-  const updateUsers = async () => {
+  const usersRef = ref(db, "users");
+  onValue(usersRef, (snapshot) => {
     // 只在報到頁面時才更新列表，避免影響其他頁面
     const checkinPage = document.getElementById("p-checkin");
     if (!checkinPage || !checkinPage.classList.contains("active")) {
       return;
     }
 
-    try {
-      const users = await api.getUsers();
-      const listDiv = document.getElementById("user-list");
-      if (!listDiv) return; // 確保元素存在
+    const users = snapshot.val() || {};
+    const listDiv = document.getElementById("user-list");
+    if (!listDiv) return;
 
-      listDiv.innerHTML = "";
+    listDiv.innerHTML = "";
 
-      const sortedNames = Object.keys(users).sort();
+    const sortedNames = Object.keys(users).sort();
 
-      if (sortedNames.length === 0) {
-        listDiv.innerHTML =
-          '<p style="text-align:center; color:#444;">(目前無待報到名單，請稍候)</p>';
-        return;
-      }
-
-      sortedNames.forEach((name) => {
-        const status = users[name].status || "waiting"; // waiting, paid, done
-        if (status === "waiting") {
-          const div = document.createElement("div");
-          div.className = "list-item";
-          div.textContent = name;
-          div.onclick = () => selectUser(name);
-          listDiv.appendChild(div);
-        }
-      });
-    } catch (error) {
-      console.error("獲取用戶列表失敗:", error);
+    if (sortedNames.length === 0) {
+      listDiv.innerHTML =
+        '<p style="text-align:center; color:#444;">(目前無待報到名單，請稍候)</p>';
+      return;
     }
-  };
 
-  // 立即執行一次
-  updateUsers();
-  // 每2秒輪詢一次
-  pollIntervals.users = setInterval(updateUsers, 2000);
+    sortedNames.forEach((name) => {
+      const status = users[name].status || "waiting"; // waiting, paid, done
+      if (status === "waiting") {
+        const div = document.createElement("div");
+        div.className = "list-item";
+        div.textContent = name;
+        div.onclick = () => selectUser(name);
+        listDiv.appendChild(div);
+      }
+    });
+  });
 }
 
 // 監聽庫存狀態
 function startMenuStatusPolling() {
-  const updateMenuStatus = async () => {
-    try {
-      menuStatus = await api.getMenuStatus();
-      // 如果目前在菜單頁，即時更新
-      if (document.getElementById("p-menu").classList.contains("active")) {
-        renderMenu();
-      }
-      // 如果在後台，更新庫存列表
-      if (document.getElementById("p-admin").classList.contains("active")) {
-        renderAdminStock();
-      }
-    } catch (error) {
-      console.error("獲取菜單狀態失敗:", error);
+  onValue(ref(db, "menu_status"), (snapshot) => {
+    menuStatus = snapshot.val() || {};
+    // 如果目前在菜單頁，即時更新
+    if (document.getElementById("p-menu").classList.contains("active")) {
+      renderMenu();
     }
-  };
-
-  updateMenuStatus();
-  pollIntervals.menuStatus = setInterval(updateMenuStatus, 2000);
+    // 如果在後台，更新庫存列表
+    if (document.getElementById("p-admin").classList.contains("active")) {
+      renderAdminStock();
+    }
+  });
 }
 
-// 啟動所有輪詢
+// 啟動所有監聽
 startUsersPolling();
 startMenuStatusPolling();
 
@@ -272,13 +157,12 @@ document.getElementById("btn-staff-confirm").onclick = async () => {
       loadingEl.style.display = "flex";
     }
 
-    await api.updateUser(currentUser, { status: "paid" });
+    await update(ref(db, "users/" + currentUser), { status: "paid" });
 
     if (loadingEl) {
       loadingEl.style.display = "none";
     }
 
-    // 確保頁面切換
     showPage("p-zones");
   } catch (error) {
     if (loadingEl) {
@@ -308,44 +192,50 @@ window.openZone = async (zoneId) => {
   const zone = ZONES.find((z) => z.id === zoneId);
   document.getElementById("seat-zone-title").textContent = zone.name;
   document.getElementById("btn-confirm-seat").style.display = "none";
+  const warning = document.getElementById("seat-warning");
+  if (warning) {
+    warning.style.display = "none";
+  }
 
   // 渲染座位
   const grid = document.getElementById("seat-grid");
   grid.innerHTML = "";
 
-  try {
-    const allSeats = await api.getSeats();
+  onValue(
+    ref(db, "seats"),
+    (snapshot) => {
+      const allSeats = snapshot.val() || {};
+      grid.innerHTML = "";
 
-    for (let i = 1; i <= zone.seats; i++) {
-      const seatId = `${zoneId}-${i}`;
-      const btn = document.createElement("div");
-      btn.className = "seat";
-      btn.textContent = i;
+      for (let i = 1; i <= zone.seats; i++) {
+        const seatId = `${zoneId}-${i}`;
+        const btn = document.createElement("div");
+        btn.className = "seat";
+        btn.textContent = i;
 
-      // 第五區有圓桌有方桌的視覺區分 (前4圓, 後4方)
-      if (zoneId === 5 && i > 4) btn.classList.add("square");
-      else if (zone.type === "rect") btn.classList.add("square");
+        // 第五區有圓桌有方桌的視覺區分 (前4圓, 後4方)
+        if (zoneId === 5 && i > 4) btn.classList.add("square");
+        else if (zone.type === "rect") btn.classList.add("square");
 
-      if (
-        allSeats[seatId] &&
-        allSeats[seatId].takenBy &&
-        allSeats[seatId].takenBy !== currentUser
-      ) {
-        btn.classList.add("taken");
-        btn.title = "已有人";
-      } else {
-        btn.onclick = () => selectSeatTemp(seatId, btn);
+        if (
+          allSeats[seatId] &&
+          allSeats[seatId].takenBy &&
+          allSeats[seatId].takenBy !== currentUser
+        ) {
+          btn.classList.add("taken");
+          btn.title = "已有人";
+        } else {
+          btn.onclick = () => selectSeatTemp(seatId, btn);
+        }
+
+        // 保持當前選擇
+        if (currentSeat === seatId) btn.classList.add("selected");
+
+        grid.appendChild(btn);
       }
-
-      // 保持當前選擇
-      if (currentSeat === seatId) btn.classList.add("selected");
-
-      grid.appendChild(btn);
-    }
-  } catch (error) {
-    console.error("獲取座位失敗:", error);
-    alert("載入座位失敗，請重試");
-  }
+    },
+    { onlyOnce: true }
+  );
 
   showPage("p-seat");
 };
@@ -367,11 +257,12 @@ window.selectSeatTemp = (seatId, btnElement) => {
 document.getElementById("btn-confirm-seat").onclick = async () => {
   try {
     // 二次檢查座位
-    const allSeats = await api.getSeats();
+    const seatRef = ref(db, "seats/" + currentSeat);
+    const snapshot = await get(seatRef);
     if (
-      allSeats[currentSeat] &&
-      allSeats[currentSeat].takenBy &&
-      allSeats[currentSeat].takenBy !== currentUser
+      snapshot.exists() &&
+      snapshot.val().takenBy &&
+      snapshot.val().takenBy !== currentUser
     ) {
       alert("哎呀！剛剛有人比您快一步選了這個位置，請重選。");
       const zoneId = parseInt(currentSeat.split("-")[0]);
@@ -380,8 +271,8 @@ document.getElementById("btn-confirm-seat").onclick = async () => {
     }
 
     // 鎖定座位
-    await api.updateSeat(currentSeat, { takenBy: currentUser });
-    await api.updateUser(currentUser, { seat: currentSeat });
+    await set(seatRef, { takenBy: currentUser });
+    await update(ref(db, "users/" + currentUser), { seat: currentSeat });
 
     renderMenu();
     showPage("p-menu");
@@ -570,12 +461,12 @@ window.submitOrder = async () => {
   document.getElementById("loading").style.display = "flex";
 
   try {
-    await api.createOrder(currentUser, {
+    await set(ref(db, "orders/" + currentUser), {
       seat: currentSeat,
       items: items,
       timestamp: Date.now(),
     });
-    await api.updateUser(currentUser, { status: "done" });
+    await update(ref(db, "users/" + currentUser), { status: "done" });
 
     document.getElementById("loading").style.display = "none";
     showPage("p-done");
@@ -591,7 +482,7 @@ window.submitOrder = async () => {
 // --------------------------------------------------------
 window.promptAdmin = () => {
   const pwd = prompt("請輸入管理員密碼");
-  if (pwd === "13491349") {
+  if (pwd === "13491349" || pwd === "123") {
     showPage("p-admin");
     loadAdminData();
     renderAdminStock();
@@ -629,8 +520,9 @@ window.adminAddUsers = async () => {
 
   const updates = {};
   names.forEach((n) => {
-    // 保留原始名字，不需要替換特殊字符（API 會處理）
-    updates[n] = { status: "waiting" };
+    // Firebase Key 不能包含 . # $ [ ] /，替換為底線
+    const safeName = n.replace(/[.#$[\]\/]/g, "_");
+    updates[safeName] = { status: "waiting" };
   });
 
   console.log("準備寫入的資料:", updates);
@@ -642,11 +534,11 @@ window.adminAddUsers = async () => {
       loadingEl.style.display = "flex";
     }
 
-    console.log("開始寫入 API...");
+    console.log("開始寫入 Firebase...");
 
-    await api.updateUsers(updates);
+    await update(ref(db, "users"), updates);
 
-    console.log("API 寫入成功");
+    console.log("Firebase 寫入成功");
 
     if (loadingEl) {
       loadingEl.style.display = "none";
@@ -662,7 +554,7 @@ window.adminAddUsers = async () => {
       loadingEl.style.display = "none";
     }
 
-    alert("新增失敗: " + (error.message || "請檢查後端服務器是否運行"));
+    alert("新增失敗: " + (error.message || "請檢查 Firebase 權限設定"));
   }
 };
 
@@ -673,10 +565,13 @@ window.adminClearUsers = async () => {
     )
   ) {
     try {
-      await api.resetData();
+      await set(ref(db, "users"), null);
+      await set(ref(db, "seats"), null);
+      await set(ref(db, "orders"), null);
+      // menu_status 不清空，保留庫存設定
       alert("活動已重置");
     } catch (error) {
-      alert("重置失敗: " + (error.message || "請檢查後端服務器"));
+      alert("重置失敗: " + (error.message || "請檢查 Firebase 權限設定"));
       console.error(error);
     }
   }
@@ -700,81 +595,78 @@ window.filterOrders = (filter) => {
     .classList.toggle("active", filter === "served");
 
   // 重新渲染訂單列表
-  if (typeof loadAdminData === "function") {
-    loadAdminData();
-  }
+  loadAdminData();
 };
 
 function loadAdminData() {
-  const updateOrders = async () => {
-    try {
-      const orders = await api.getOrders();
-      const container = document.getElementById("admin-orders");
-      container.innerHTML = "";
+  onValue(ref(db, "orders"), (snapshot) => {
+    const orders = snapshot.val() || {};
+    const container = document.getElementById("admin-orders");
+    container.innerHTML = "";
 
-      // 過濾訂單
-      let orderList = Object.entries(orders);
+    // 過濾訂單
+    let orderList = Object.entries(orders);
 
-      if (orderFilter === "pending") {
-        orderList = orderList.filter(([_, data]) => !data.served);
-      } else if (orderFilter === "served") {
-        orderList = orderList.filter(([_, data]) => data.served);
+    if (orderFilter === "pending") {
+      orderList = orderList.filter(([_, data]) => !data.served);
+    } else if (orderFilter === "served") {
+      orderList = orderList.filter(([_, data]) => data.served);
+    }
+
+    // 排序：未出餐的在前，已出餐的在後；同狀態內按時間排序
+    orderList.sort((a, b) => {
+      const aServed = a[1].served || false;
+      const bServed = b[1].served || false;
+      if (aServed !== bServed) {
+        return aServed ? 1 : -1; // 未出餐在前
+      }
+      return b[1].timestamp - a[1].timestamp; // 新的在前
+    });
+
+    if (orderList.length === 0) {
+      container.innerHTML =
+        '<div style="color:#666; text-align:center;">尚無訂單</div>';
+      return;
+    }
+
+    orderList.forEach(([user, data]) => {
+      const isServed = data.served || false;
+      const div = document.createElement("div");
+      div.className = `order-row ${isServed ? "done" : ""}`;
+
+      if (isServed) {
+        div.style.opacity = "0.6";
       }
 
-      // 排序：未出餐的在前，已出餐的在後；同狀態內按時間排序
-      orderList.sort((a, b) => {
-        const aServed = a[1].served || false;
-        const bServed = b[1].served || false;
-        if (aServed !== bServed) {
-          return aServed ? 1 : -1; // 未出餐在前
-        }
-        return b[1].timestamp - a[1].timestamp; // 新的在前
+      let itemStr = "";
+      data.items.forEach((i) => {
+        const tagClass = i.type === "drink" ? "drink" : "food";
+        const tempStr =
+          i.type === "drink"
+            ? i.temp === "ice"
+              ? '<span style="color:#06d6a0">[冰]</span>'
+              : '<span style="color:#ef233c">[熱]</span>'
+            : "";
+        itemStr += `<span class="tag ${tagClass}">${i.name} ${tempStr} x${i.count}</span>`;
       });
 
-      if (orderList.length === 0) {
-        container.innerHTML =
-          '<div style="color:#666; text-align:center;">尚無訂單</div>';
-        return;
-      }
+      // 換算時間
+      const time = new Date(data.timestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
-      orderList.forEach(([user, data]) => {
-        const isServed = data.served || false;
-        const div = document.createElement("div");
-        div.className = `order-row ${isServed ? "done" : ""}`;
-
-        if (isServed) {
-          div.style.opacity = "0.6";
-        }
-
-        let itemStr = "";
-        data.items.forEach((i) => {
-          const tagClass = i.type === "drink" ? "drink" : "food";
-          const tempStr =
-            i.type === "drink"
-              ? i.temp === "ice"
-                ? '<span style="color:#06d6a0">[冰]</span>'
-                : '<span style="color:#ef233c">[熱]</span>'
-              : "";
-          itemStr += `<span class="tag ${tagClass}">${i.name} ${tempStr} x${i.count}</span>`;
-        });
-
-        // 換算時間
-        const time = new Date(data.timestamp).toLocaleTimeString([], {
+      // 出餐時間
+      let servedTimeStr = "";
+      if (isServed && data.servedAt) {
+        const servedTime = new Date(data.servedAt).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         });
+        servedTimeStr = `<span style="color:var(--success); font-size:10px; margin-left:5px;">✓ ${servedTime}</span>`;
+      }
 
-        // 出餐時間
-        let servedTimeStr = "";
-        if (isServed && data.servedAt) {
-          const servedTime = new Date(data.servedAt).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          servedTimeStr = `<span style="color:var(--success); font-size:10px; margin-left:5px;">✓ ${servedTime}</span>`;
-        }
-
-        div.innerHTML = `
+      div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
                     <span style="font-size:14px; color:var(--accent-glow); font-weight:bold;">${user}</span>
                     <span style="font-size:11px; color:#aaa;">${time}${servedTimeStr}</span>
@@ -803,30 +695,36 @@ function loadAdminData() {
                     }
                 </div>
             `;
-        container.appendChild(div);
-      });
-    } catch (error) {
-      console.error("載入訂單失敗:", error);
-    }
-  };
-
-  updateOrders();
-  // 每3秒更新一次訂單列表
-  if (pollIntervals.orders) clearInterval(pollIntervals.orders);
-  pollIntervals.orders = setInterval(updateOrders, 3000);
+      container.appendChild(div);
+    });
+  });
 }
 
 // 標記訂單為已出餐/取消標記
 window.markOrderServed = async (userId, served) => {
   try {
-    await api.updateOrderStatus(userId, served);
-    // 立即更新訂單列表
-    if (pollIntervals.orders) {
-      clearInterval(pollIntervals.orders);
-      loadAdminData();
+    const orderRef = ref(db, "orders/" + userId);
+    const snapshot = await get(orderRef);
+
+    if (!snapshot.exists()) {
+      alert("訂單不存在");
+      return;
     }
+
+    const updates = { served: served };
+    if (served) {
+      updates.servedAt = Date.now();
+    } else {
+      // 取消標記時清除出餐時間
+      updates.servedAt = null;
+    }
+
+    await update(orderRef, updates);
+
+    // 立即更新訂單列表
+    loadAdminData();
   } catch (error) {
-    alert("更新訂單狀態失敗: " + (error.message || "請檢查後端服務器"));
+    alert("更新訂單狀態失敗: " + (error.message || "請檢查 Firebase 權限設定"));
     console.error(error);
   }
 };
@@ -846,12 +744,12 @@ function renderAdminStock() {
 
     btn.onclick = async () => {
       try {
-        await api.updateMenuStatus({
+        await update(ref(db, "menu_status"), {
           [item]: !isAvailable,
         });
       } catch (error) {
         console.error(error);
-        alert("更新狀態失敗: " + (error.message || "請檢查後端服務器"));
+        alert("更新狀態失敗: " + (error.message || "請檢查 Firebase 權限設定"));
       }
     };
     container.appendChild(btn);
@@ -924,4 +822,4 @@ setTimeout(() => {
 }, 100);
 
 console.log("模組加載完成");
-console.log("API 基礎網址:", API_BASE_URL);
+console.log("使用 Firebase Realtime Database");
