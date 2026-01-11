@@ -891,26 +891,39 @@ window.checkNameAndGoToZones = async () => {
   }
 
   try {
-    // 檢查用戶是否存在
-    const userRef = ref(db, "users/" + inputName);
-    const userSnapshot = await get(userRef);
+    // 獲取所有用戶，進行大小寫不敏感的比對
+    const usersRef = ref(db, "users");
+    const usersSnapshot = await get(usersRef);
 
-    if (!userSnapshot.exists()) {
+    if (!usersSnapshot.exists()) {
       alert("找不到此報到名稱，請確認名稱是否正確");
       nameInput.focus();
       return;
     }
 
-    const userData = userSnapshot.val();
+    const allUsers = usersSnapshot.val() || {};
+    // 找到大小寫不敏感匹配的用戶名稱（使用原始 Firebase key）
+    const matchedUserName = Object.keys(allUsers).find(
+      (name) => name.toLowerCase() === inputName.toLowerCase()
+    );
+
+    if (!matchedUserName) {
+      alert("找不到此報到名稱，請確認名稱是否正確");
+      nameInput.focus();
+      return;
+    }
+
+    // 使用匹配到的原始用戶名稱
+    const userData = allUsers[matchedUserName];
     const userStatus = userData.status || "waiting";
 
-    // 檢查訂單是否存在
-    const orderRef = ref(db, "orders/" + inputName);
+    // 檢查訂單是否存在（使用原始用戶名稱）
+    const orderRef = ref(db, "orders/" + matchedUserName);
     const orderSnapshot = await get(orderRef);
 
     // 如果用戶已付款但沒有訂單，允許繼續完成流程（選擇座位和點餐）
     if (userStatus === "paid" && !orderSnapshot.exists()) {
-      currentUser = inputName;
+      currentUser = matchedUserName;
       if (userData.seat) {
         currentSeat = userData.seat;
       }
@@ -931,7 +944,7 @@ window.checkNameAndGoToZones = async () => {
       }
 
       // 已出餐，設置為當前用戶並進入區域選擇頁面
-      currentUser = inputName;
+      currentUser = matchedUserName;
       if (orderData.seat) {
         currentSeat = orderData.seat;
       }
