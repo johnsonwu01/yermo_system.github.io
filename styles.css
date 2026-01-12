@@ -171,6 +171,42 @@ h1 {
   color: #666;
 }
 
+/* 模态框中的座位网格（更小尺寸，适合手机） */
+#admin-seats-list .seat-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+#admin-seats-list .seat {
+  font-size: 10px;
+  border-width: 1.5px;
+  min-height: 50px;
+}
+
+/* 座位狀態樣式（用於後台查看） */
+.seat.taken.served {
+  border-color: var(--success);
+  background: rgba(6, 214, 160, 0.15);
+  text-decoration: none;
+  color: var(--text-main);
+}
+
+.seat.taken.served::after {
+  display: none;
+}
+
+.seat.taken.pending {
+  border-color: #ffb800;
+  background: rgba(255, 184, 0, 0.15);
+  text-decoration: none;
+  color: var(--text-main);
+}
+
+.seat.taken.pending::after {
+  display: none;
+}
+
 /* 菜單樣式 */
 .menu-item {
   display: flex;
@@ -473,4 +509,14 @@ h1 {
 
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
+}
+
+/* textarea 隱藏滾動條 */
+textarea.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+textarea.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }

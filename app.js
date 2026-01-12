@@ -11,7 +11,7 @@ import {
   get,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// Firebase 配置
+//Firebase 配置 - 正式
 const firebaseConfig = {
   apiKey: "AIzaSyC856BX7Sl6iHyjDIyOwe4nh5Q1Pea-tvk",
   authDomain: "yermo-acf82.firebaseapp.com",
@@ -24,6 +24,17 @@ const firebaseConfig = {
   measurementId: "G-47QMRFYW7C",
 };
 
+//本地測試
+// const firebaseConfig = {
+//   apiKey: "AIzaSyAC3oTXktNUrgl331CU4-mnJvNm8paUywE",
+//   authDomain: "yermonew.firebaseapp.com",
+//   databaseURL: "https://yermonew-default-rtdb.firebaseio.com",
+//   projectId: "yermonew",
+//   storageBucket: "yermonew.firebasestorage.app",
+//   messagingSenderId: "82246020578",
+//   appId: "1:82246020578:web:4bb70cbcaa6067d4e61dbb",
+//   measurementId: "G-7LJVSRRV0M",
+// };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -138,7 +149,7 @@ window.alert = (message) => {
   showToast(message, "info", 3000);
 };
 
-// 區域資料 (完全依照需求文字)
+// 區域資料 (預設)
 const ZONES = [
   {
     id: 1,
@@ -178,7 +189,14 @@ const ZONES = [
 ];
 
 const MENU = {
-  drinks: ["美式", "拿鐵", "可可牛奶", "黑糖鮮奶", "伯爵茶", "洋甘菊茶(僅熱)"],
+  drinks: [
+    "美式",
+    "拿鐵",
+    "可可牛奶",
+    "黑糖鮮奶茶",
+    "伯爵茶",
+    "洋甘菊茶(僅熱)",
+  ],
   foods: ["細薯條", "肉桂捲", "提拉米蘇"],
 };
 
@@ -330,23 +348,124 @@ document.getElementById("btn-staff-confirm").onclick = async () => {
   }
 };
 
-// 區域顯示
-const zoneContainer = document.getElementById("zone-container");
-ZONES.forEach((zone) => {
-  const div = document.createElement("div");
-  div.className = "zone-card";
-  div.innerHTML = `
-        <div class="zone-title">${zone.name}</div>
-        <div class="zone-desc">${zone.desc}</div>
-        <button class="btn outline" style="margin-top:10px; padding:12px; border-radius:8px;" onclick="openZone(${zone.id})">
-            選擇此區座位 →
-        </button>
-    `;
-  zoneContainer.appendChild(div);
-});
+// 解析區域描述，提取狀態、任務、提醒
+function parseZoneDesc(desc) {
+  const parts = {
+    status: "",
+    task: "",
+    reminder: "",
+  };
+
+  if (!desc) return parts;
+
+  const statusMatch = desc.match(/狀態[：:]\s*(.+?)(?=\n\n任務|$)/s);
+  const taskMatch = desc.match(/任務[：:]\s*(.+?)(?=\n\n提醒|$)/s);
+  const reminderMatch = desc.match(/提醒[：:]\s*(.+?)$/s);
+
+  if (statusMatch) parts.status = statusMatch[1].trim();
+  if (taskMatch) parts.task = taskMatch[1].trim();
+  if (reminderMatch) parts.reminder = reminderMatch[1].trim();
+
+  return parts;
+}
+
+// 組合區域描述
+function combineZoneDesc(status, task, reminder) {
+  let desc = "";
+  if (status) desc += `狀態：${status}`;
+  if (task) {
+    if (desc) desc += "\n\n";
+    desc += `任務：${task}`;
+  }
+  if (reminder) {
+    if (desc) desc += "\n\n";
+    desc += `提醒：${reminder}`;
+  }
+  return desc;
+}
+
+// 區域顯示（從 Firebase 讀取並合併數據）
+function renderZones() {
+  const zoneContainer = document.getElementById("zone-container");
+  if (!zoneContainer) return;
+
+  zoneContainer.innerHTML = "";
+
+  // 從 Firebase 讀取區域內容
+  const zonesRef = ref(db, "zones_content");
+  get(zonesRef)
+    .then((snapshot) => {
+      const zonesContent = snapshot.exists() ? snapshot.val() : {};
+
+      ZONES.forEach((zone) => {
+        const zoneId = zone.id;
+        const savedContent = zonesContent[zoneId] || {};
+
+        // 優先使用 Firebase 中的內容，如果沒有則使用默認值
+        let finalDesc = zone.desc;
+        if (savedContent.status || savedContent.task || savedContent.reminder) {
+          finalDesc = combineZoneDesc(
+            savedContent.status || parseZoneDesc(zone.desc).status,
+            savedContent.task || parseZoneDesc(zone.desc).task,
+            savedContent.reminder || parseZoneDesc(zone.desc).reminder
+          );
+        }
+
+        const div = document.createElement("div");
+        div.className = "zone-card";
+        div.innerHTML = `
+            <div class="zone-title">${zone.name}</div>
+            <div class="zone-desc">${finalDesc}</div>
+            <button class="btn outline" style="margin-top:10px; padding:12px; border-radius:8px;" onclick="openZone(${zoneId})">
+                選擇此區座位 →
+            </button>
+        `;
+        zoneContainer.appendChild(div);
+      });
+    })
+    .catch((error) => {
+      console.error("讀取區域內容失敗:", error);
+      // 如果讀取失敗，使用默認值
+      ZONES.forEach((zone) => {
+        const div = document.createElement("div");
+        div.className = "zone-card";
+        div.innerHTML = `
+            <div class="zone-title">${zone.name}</div>
+            <div class="zone-desc">${zone.desc}</div>
+            <button class="btn outline" style="margin-top:10px; padding:12px; border-radius:8px;" onclick="openZone(${zone.id})">
+                選擇此區座位 →
+            </button>
+        `;
+        zoneContainer.appendChild(div);
+      });
+    });
+}
+
+// 初始化區域顯示
+renderZones();
 
 window.openZone = async (zoneId) => {
-  const zone = ZONES.find((z) => z.id === zoneId);
+  // 從 Firebase 讀取區域內容以獲取最新描述
+  let zone = ZONES.find((z) => z.id === zoneId);
+  try {
+    const zonesRef = ref(db, "zones_content/" + zoneId);
+    const snapshot = await get(zonesRef);
+    if (snapshot.exists()) {
+      const savedContent = snapshot.val();
+      const defaultParts = parseZoneDesc(zone.desc);
+      zone = {
+        ...zone,
+        desc: combineZoneDesc(
+          savedContent.status || defaultParts.status,
+          savedContent.task || defaultParts.task,
+          savedContent.reminder || defaultParts.reminder
+        ),
+      };
+    }
+  } catch (error) {
+    console.error("讀取區域內容失敗:", error);
+  }
+
   document.getElementById("seat-zone-title").textContent = zone.name;
   document.getElementById("btn-confirm-seat").style.display = "none";
   const warning = document.getElementById("seat-warning");
@@ -377,7 +496,16 @@ window.openZone = async (zoneId) => {
           // 第二區：第7、8號座位是方的
           if (seatNum === 7 || seatNum === 8) btn.classList.add("square");
 
-          if (
+          // 檢查座位是否被關閉
+          if (allSeats[seatId] && allSeats[seatId].closed === true) {
+            btn.classList.add("closed");
+            btn.style.opacity = "0.5";
+            btn.style.background = "#333";
+            btn.style.border = "2px dashed #666";
+            btn.style.cursor = "not-allowed";
+            // 顯示「今日未開啟」文字，不改變按鈕大小
+            btn.innerHTML = `<div style="font-size: 12px; color: #666; line-height: 1; margin-top: 2px;">今日未開啟</div>`;
+          } else if (
             allSeats[seatId] &&
             allSeats[seatId].takenBy &&
             allSeats[seatId].takenBy !== currentUser
@@ -417,7 +545,16 @@ window.openZone = async (zoneId) => {
             )
               btn.classList.add("square");
 
-            if (
+            // 檢查座位是否被關閉
+            if (allSeats[seatId] && allSeats[seatId].closed === true) {
+              btn.classList.add("closed");
+              btn.style.opacity = "0.5";
+              btn.style.background = "#333";
+              btn.style.border = "2px dashed #666";
+              btn.style.cursor = "not-allowed";
+              // 顯示「今日未開啟」文字，不改變按鈕大小
+              btn.innerHTML = `<div style="font-size: 12px; color: #666; line-height: 1; margin-top: 2px;">今日未開啟</div>`;
+            } else if (
               allSeats[seatId] &&
               allSeats[seatId].takenBy &&
               allSeats[seatId].takenBy !== currentUser
@@ -453,7 +590,16 @@ window.openZone = async (zoneId) => {
             // 第四區：所有座位都是方的（rect類型）
             btn.classList.add("square");
 
-            if (
+            // 檢查座位是否被關閉
+            if (allSeats[seatId] && allSeats[seatId].closed === true) {
+              btn.classList.add("closed");
+              btn.style.opacity = "0.5";
+              btn.style.background = "#333";
+              btn.style.border = "2px dashed #666";
+              btn.style.cursor = "not-allowed";
+              // 顯示「今日未開啟」文字，不改變按鈕大小
+              btn.innerHTML = `<div style="font-size: 12px; color: #666; line-height: 1; margin-top: 2px;">今日未開啟</div>`;
+            } else if (
               allSeats[seatId] &&
               allSeats[seatId].takenBy &&
               allSeats[seatId].takenBy !== currentUser
@@ -495,7 +641,16 @@ window.openZone = async (zoneId) => {
             )
               btn.classList.add("square");
 
-            if (
+            // 檢查座位是否被關閉
+            if (allSeats[seatId] && allSeats[seatId].closed === true) {
+              btn.classList.add("closed");
+              btn.style.opacity = "0.5";
+              btn.style.background = "#333";
+              btn.style.border = "2px dashed #666";
+              btn.style.cursor = "not-allowed";
+              // 顯示「今日未開啟」文字，不改變按鈕大小
+              btn.innerHTML = `<div style="font-size: 12px; color: #666; line-height: 1; margin-top: 2px;">今日未開啟</div>`;
+            } else if (
               allSeats[seatId] &&
               allSeats[seatId].takenBy &&
               allSeats[seatId].takenBy !== currentUser
@@ -522,7 +677,14 @@ window.openZone = async (zoneId) => {
 
           if (zone.type === "rect") btn.classList.add("square");
 
-          if (
+          // 檢查座位是否被關閉
+          if (allSeats[seatId] && allSeats[seatId].closed === true) {
+            btn.classList.add("closed");
+            btn.style.opacity = "0.5";
+            btn.style.background = "#333";
+            btn.style.border = "2px dashed #666";
+            btn.innerHTML = `<div style="font-size: 12px; color: #666; line-height: 1; margin-top: 2px;">今日未開啟</div>`;
+          } else if (
             allSeats[seatId] &&
             allSeats[seatId].takenBy &&
             allSeats[seatId].takenBy !== currentUser
@@ -1456,6 +1618,655 @@ window.markOrderServed = async (userId, served) => {
   }
 };
 
+// 啟動座位數據監聽（當進入後台時）
+let adminSeatsPollingStarted = false;
+let seatsDataCache = {};
+let ordersDataCache = {};
+
+function startAdminSeatsPolling() {
+  // 避免重複註冊監聽器
+  if (adminSeatsPollingStarted) return;
+  adminSeatsPollingStarted = true;
+
+  const seatsRef = ref(db, "seats");
+  const ordersRef = ref(db, "orders");
+
+  // 監聽座位變化
+  onValue(seatsRef, (snapshot) => {
+    seatsDataCache = snapshot.val() || {};
+    // 如果模态框打开，更新显示
+    const seatsModal = document.getElementById("seats-modal");
+    if (seatsModal && seatsModal.classList.contains("show")) {
+      renderAdminSeatsWithData(seatsDataCache, ordersDataCache);
+    }
+  });
+
+  // 監聽訂單變化
+  onValue(ordersRef, (snapshot) => {
+    ordersDataCache = snapshot.val() || {};
+    // 如果模态框打开，更新显示
+    const seatsModal = document.getElementById("seats-modal");
+    if (seatsModal && seatsModal.classList.contains("show")) {
+      renderAdminSeatsWithData(seatsDataCache, ordersDataCache);
+    }
+  });
+}
+
+// 顯示所有座位模态框
+window.showAllSeatsModal = async () => {
+  const modal = document.getElementById("seats-modal");
+  if (!modal) {
+    alert("找不到模态框元素");
+    return;
+  }
+
+  // 顯示模态框
+  modal.classList.add("show");
+
+  // 如果有緩存數據，直接使用；否則獲取數據
+  if (
+    Object.keys(seatsDataCache).length === 0 ||
+    Object.keys(ordersDataCache).length === 0
+  ) {
+    try {
+      const seatsRef = ref(db, "seats");
+      const ordersRef = ref(db, "orders");
+      const [seatsSnapshot, ordersSnapshot] = await Promise.all([
+        get(seatsRef),
+        get(ordersRef),
+      ]);
+      seatsDataCache = seatsSnapshot.val() || {};
+      ordersDataCache = ordersSnapshot.val() || {};
+    } catch (error) {
+      console.error("獲取座位數據失敗:", error);
+      showToast("載入座位數據失敗", "error");
+      return;
+    }
+  }
+
+  // 渲染座位數據
+  renderAdminSeatsWithData(seatsDataCache, ordersDataCache);
+};
+
+// 關閉座位模态框
+window.closeSeatsModal = () => {
+  const modal = document.getElementById("seats-modal");
+  if (modal) {
+    modal.classList.remove("show");
+  }
+};
+
+// 使用已有數據渲染座位（避免重複獲取）
+function renderAdminSeatsWithData(seats, orders) {
+  const container = document.getElementById("admin-seats-list");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  // 遍歷所有區域
+  ZONES.forEach((zone) => {
+    // 創建區域標題
+    const zoneDiv = document.createElement("div");
+    zoneDiv.style.marginBottom = "15px";
+    zoneDiv.style.padding = "8px";
+    zoneDiv.style.background = "#1a1a24";
+    zoneDiv.style.borderRadius = "8px";
+    zoneDiv.style.borderLeft = "3px solid var(--accent)";
+
+    const zoneTitle = document.createElement("h4");
+    zoneTitle.textContent = zone.name;
+    zoneTitle.style.margin = "0 0 10px 0";
+    zoneTitle.style.fontSize = "13px";
+    zoneTitle.style.color = "var(--accent-glow)";
+    zoneDiv.appendChild(zoneTitle);
+
+    // 創建座位網格（使用與選擇座位相同的樣式）
+    const seatsGrid = document.createElement("div");
+    seatsGrid.className = "seat-grid";
+
+    const zoneId = zone.id;
+
+    // 根據區域使用相同的排列邏輯
+    if (zoneId === 2) {
+      // 第二區特殊排列：1 2 3 7 / 5 6 4 8
+      const seatOrder = [1, 2, 3, 7, 5, 6, 4, 8];
+      seatOrder.forEach((seatNum) => {
+        const seatId = `${zoneId}-${seatNum}`;
+        const seatData = seats[seatId] || {};
+        const takenBy = seatData.takenBy || null;
+        const isClosed = seatData.closed === true;
+
+        let isServed = false;
+        if (takenBy && orders[takenBy]) {
+          isServed = orders[takenBy].served === true;
+        }
+
+        const btn = createSeatElement(
+          seatNum,
+          seatId,
+          takenBy,
+          isServed,
+          seatNum === 7 || seatNum === 8,
+          isClosed
+        );
+        seatsGrid.appendChild(btn);
+      });
+    } else if (zoneId === 3) {
+      // 第三區特殊排列：1 (空) 3 4 / 2 (空) 5 6
+      const seatOrder = [1, null, 3, 4, 2, null, 5, 6];
+      seatOrder.forEach((seatNum) => {
+        if (seatNum === null) {
+          const emptyDiv = document.createElement("div");
+          emptyDiv.style.visibility = "hidden";
+          seatsGrid.appendChild(emptyDiv);
+        } else {
+          const seatId = `${zoneId}-${seatNum}`;
+          const seatData = seats[seatId] || {};
+          const takenBy = seatData.takenBy || null;
+          const isClosed = seatData.closed === true;
+
+          let isServed = false;
+          if (takenBy && orders[takenBy]) {
+            isServed = orders[takenBy].served === true;
+          }
+
+          const btn = createSeatElement(
+            seatNum,
+            seatId,
+            takenBy,
+            isServed,
+            seatNum === 3 || seatNum === 4 || seatNum === 5 || seatNum === 6,
+            isClosed
+          );
+          seatsGrid.appendChild(btn);
+        }
+      });
+    } else if (zoneId === 4) {
+      // 第四區特殊排列：1 3 5 / 2 4 6
+      const seatOrder = [1, 3, 5, null, 2, 4, 6, null];
+      seatOrder.forEach((seatNum) => {
+        if (seatNum === null) {
+          const emptyDiv = document.createElement("div");
+          emptyDiv.style.visibility = "hidden";
+          seatsGrid.appendChild(emptyDiv);
+        } else {
+          const seatId = `${zoneId}-${seatNum}`;
+          const seatData = seats[seatId] || {};
+          const takenBy = seatData.takenBy || null;
+          const isClosed = seatData.closed === true;
+
+          let isServed = false;
+          if (takenBy && orders[takenBy]) {
+            isServed = orders[takenBy].served === true;
+          }
+
+          const btn = createSeatElement(
+            seatNum,
+            seatId,
+            takenBy,
+            isServed,
+            true,
+            isClosed
+          );
+          seatsGrid.appendChild(btn);
+        }
+      });
+    } else if (zoneId === 5) {
+      // 第五區特殊排列：1 2 5 6 / 3 4 7 8
+      const seatOrder = [1, 2, 5, 6, 3, 4, 7, 8];
+      seatOrder.forEach((seatNum) => {
+        const seatId = `${zoneId}-${seatNum}`;
+        const seatData = seats[seatId] || {};
+        const takenBy = seatData.takenBy || null;
+        const isClosed = seatData.closed === true;
+
+        let isServed = false;
+        if (takenBy && orders[takenBy]) {
+          isServed = orders[takenBy].served === true;
+        }
+
+        const btn = createSeatElement(
+          seatNum,
+          seatId,
+          takenBy,
+          isServed,
+          seatNum === 5 || seatNum === 6 || seatNum === 7 || seatNum === 8,
+          isClosed
+        );
+        seatsGrid.appendChild(btn);
+      });
+    } else {
+      // 其他區域正常排列
+      for (let seatNum = 1; seatNum <= zone.seats; seatNum++) {
+        const seatId = `${zoneId}-${seatNum}`;
+        const seatData = seats[seatId] || {};
+        const takenBy = seatData.takenBy || null;
+        const isClosed = seatData.closed === true;
+
+        let isServed = false;
+        if (takenBy && orders[takenBy]) {
+          isServed = orders[takenBy].served === true;
+        }
+
+        const btn = createSeatElement(
+          seatNum,
+          seatId,
+          takenBy,
+          isServed,
+          zone.type === "rect",
+          isClosed
+        );
+        seatsGrid.appendChild(btn);
+      }
+    }
+
+    zoneDiv.appendChild(seatsGrid);
+    container.appendChild(zoneDiv);
+  });
+}
+
+// 創建座位元素（使用與選擇座位相同的樣式）
+function createSeatElement(
+  seatNum,
+  seatId,
+  takenBy,
+  isServed,
+  isSquare,
+  isClosed
+) {
+  const btn = document.createElement("div");
+  btn.className = "seat";
+  if (isSquare) btn.classList.add("square");
+
+  // 如果座位被關閉
+  if (isClosed) {
+    btn.classList.add("closed");
+    btn.style.opacity = "0.5";
+    btn.style.background = "#333";
+    btn.style.border = "2px dashed #666";
+    btn.style.cursor = "pointer";
+
+    const content = document.createElement("div");
+    content.style.display = "flex";
+    content.style.flexDirection = "column";
+    content.style.alignItems = "center";
+    content.style.justifyContent = "center";
+    content.style.width = "100%";
+    content.style.height = "100%";
+    content.style.padding = "4px";
+
+    const seatNumEl = document.createElement("div");
+    seatNumEl.textContent = seatNum;
+    seatNumEl.style.fontWeight = "bold";
+    seatNumEl.style.fontSize = "14px";
+    seatNumEl.style.marginBottom = "5px";
+    seatNumEl.style.color = "#888";
+    content.appendChild(seatNumEl);
+
+    const closedText = document.createElement("div");
+    closedText.textContent = "今日未開啟";
+    closedText.style.fontSize = "10px";
+    closedText.style.color = "#666";
+    closedText.style.textAlign = "center";
+    content.appendChild(closedText);
+
+    btn.appendChild(content);
+
+    // 添加點擊事件切換關閉狀態
+    btn.onclick = async () => {
+      try {
+        const seatRef = ref(db, "seats/" + seatId);
+        const seatSnapshot = await get(seatRef);
+        const currentData = seatSnapshot.exists() ? seatSnapshot.val() : {};
+
+        // 移除關閉標記
+        await update(seatRef, { closed: null });
+        showToast("座位已開啟", "success");
+      } catch (error) {
+        console.error("開啟座位失敗:", error);
+        showToast("開啟座位失敗", "error");
+      }
+    };
+
+    return btn;
+  }
+
+  // 如果座位被占用
+  if (takenBy) {
+    btn.classList.add("taken");
+    if (isServed) {
+      btn.classList.add("served");
+    } else {
+      btn.classList.add("pending");
+    }
+    btn.style.position = "relative";
+
+    // 創建內容容器
+    const content = document.createElement("div");
+    content.style.display = "flex";
+    content.style.flexDirection = "column";
+    content.style.alignItems = "center";
+    content.style.justifyContent = "center";
+    content.style.width = "100%";
+    content.style.height = "100%";
+    content.style.padding = "4px";
+    content.style.fontSize = "10px";
+    content.style.lineHeight = "1.3";
+
+    // 座位編號
+    const seatNumEl = document.createElement("div");
+    seatNumEl.textContent = seatNum;
+    seatNumEl.style.fontWeight = "bold";
+    seatNumEl.style.fontSize = "14px";
+    seatNumEl.style.marginBottom = "3px";
+    content.appendChild(seatNumEl);
+
+    // 用戶名稱（完整顯示）
+    const userNameEl = document.createElement("div");
+    userNameEl.textContent = takenBy;
+    userNameEl.style.fontSize = "16px";
+    userNameEl.style.color = "var(--accent-glow)";
+    userNameEl.style.marginBottom = "3px";
+    userNameEl.style.wordBreak = "break-word";
+    userNameEl.style.textAlign = "center";
+    userNameEl.style.lineHeight = "1.2";
+    content.appendChild(userNameEl);
+
+    // 出餐狀態
+    const statusEl = document.createElement("div");
+    if (isServed) {
+      statusEl.textContent = "✓";
+      statusEl.style.color = "var(--success)";
+      statusEl.style.fontSize = "12px";
+      statusEl.style.fontWeight = "bold";
+    } else {
+      statusEl.textContent = "⏳";
+      statusEl.style.color = "#ffb800";
+      statusEl.style.fontSize = "12px";
+      statusEl.style.fontWeight = "bold";
+    }
+    content.appendChild(statusEl);
+
+    btn.appendChild(content);
+
+    // 添加 title 提示
+    btn.title = `${seatId}\n${takenBy}\n${isServed ? "已出餐" : "待出餐"}`;
+  } else {
+    // 空座位
+    btn.textContent = seatNum;
+    btn.title = `${seatId} - 空位（點擊可關閉）`;
+    btn.style.cursor = "pointer";
+
+    // 添加點擊事件切換關閉狀態
+    btn.onclick = async () => {
+      try {
+        const seatRef = ref(db, "seats/" + seatId);
+        // 設置關閉標記
+        await update(seatRef, { closed: true });
+        showToast("座位已關閉", "info");
+      } catch (error) {
+        console.error("關閉座位失敗:", error);
+        showToast("關閉座位失敗", "error");
+      }
+    };
+  }
+
+  return btn;
+}
+
+// 切換前台開關面板
+window.toggleMaintenancePanel = () => {
+  const panel = document.getElementById("maintenance-panel");
+  const toggleBtn = document.getElementById("maintenance-toggle-btn");
+
+  if (!panel || !toggleBtn) return;
+
+  const isVisible = panel.style.display !== "none";
+
+  if (isVisible) {
+    panel.style.display = "none";
+    toggleBtn.textContent = "⚙️ 前台開關";
+  } else {
+    panel.style.display = "block";
+    toggleBtn.textContent = "⚙️ 前台開關";
+  }
+};
+
+// 切換位置與區域管理面板
+window.toggleSeatsZonesPanel = () => {
+  const panel = document.getElementById("seats-zones-panel");
+  const toggleBtn = document.getElementById("seats-zones-toggle-btn");
+
+  if (!panel || !toggleBtn) return;
+
+  const isVisible = panel.style.display !== "none";
+
+  if (isVisible) {
+    panel.style.display = "none";
+    toggleBtn.textContent = "🪑 位置與區域";
+  } else {
+    panel.style.display = "block";
+    toggleBtn.textContent = "🪑 位置與區域";
+  }
+};
+
+// 切換報到名單面板
+window.toggleNamesPanel = () => {
+  const panel = document.getElementById("names-panel");
+  const toggleBtn = document.getElementById("names-toggle-btn");
+
+  if (!panel || !toggleBtn) return;
+
+  const isVisible = panel.style.display !== "none";
+
+  if (isVisible) {
+    panel.style.display = "none";
+    toggleBtn.textContent = "📝 報到名單";
+  } else {
+    panel.style.display = "block";
+    toggleBtn.textContent = "📝 報到名單";
+  }
+};
+
+// 切換區域列表顯示
+window.toggleZonesList = () => {
+  const container = document.getElementById("admin-zones-list");
+  const toggleBtn = document.getElementById("zones-toggle-btn");
+
+  if (!container || !toggleBtn) return;
+
+  const isVisible = container.style.display !== "none";
+
+  if (isVisible) {
+    container.style.display = "none";
+    toggleBtn.textContent = "✏️ 區域內容管理";
+  } else {
+    container.style.display = "block";
+    toggleBtn.textContent = "✏️ 收合區域管理";
+    // 如果列表為空，則渲染
+    if (container.innerHTML === "") {
+      renderAdminZones();
+    }
+  }
+};
+
+// 區域管理渲染
+function renderAdminZones() {
+  const container = document.getElementById("admin-zones-list");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  // 從 Firebase 讀取區域內容
+  const zonesRef = ref(db, "zones_content");
+  get(zonesRef)
+    .then((snapshot) => {
+      const zonesContent = snapshot.exists() ? snapshot.val() : {};
+
+      ZONES.forEach((zone) => {
+        const zoneId = zone.id;
+        const savedContent = zonesContent[zoneId] || {};
+        const defaultParts = parseZoneDesc(zone.desc);
+
+        // 使用保存的內容或默認值
+        const status = savedContent.status || defaultParts.status;
+        const task = savedContent.task || defaultParts.task;
+        const reminder = savedContent.reminder || defaultParts.reminder;
+
+        const zoneDiv = document.createElement("div");
+        zoneDiv.style.marginBottom = "15px";
+        zoneDiv.style.padding = "12px";
+        zoneDiv.style.background = "#1a1a24";
+        zoneDiv.style.borderRadius = "6px";
+        zoneDiv.style.border = "1px solid #333";
+
+        zoneDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px;">
+          <h4 style="margin: 0; font-size: 14px; color: var(--accent-glow); flex: 1;">${
+            zone.name
+          }</h4>
+          <button 
+            class="btn outline" 
+            onclick="editZone(${zoneId})"
+            style="padding: 2px 6px !important; font-size: 10px !important; margin: 0 !important; flex-shrink: 0; white-space: nowrap; min-width: auto !important; width: auto !important; line-height: 1.2;"
+          >
+            編輯
+          </button>
+        </div>
+        <div style="font-size: 11px; color: #888; line-height: 1.5;">
+          <div style="margin-bottom: 5px;"><strong>狀態：</strong>${status.substring(
+            0,
+            50
+          )}${status.length > 50 ? "..." : ""}</div>
+          <div style="margin-bottom: 5px;"><strong>任務：</strong>${task.substring(
+            0,
+            50
+          )}${task.length > 50 ? "..." : ""}</div>
+          <div><strong>提醒：</strong>${reminder.substring(0, 50)}${
+          reminder.length > 50 ? "..." : ""
+        }</div>
+        </div>
+      `;
+
+        container.appendChild(zoneDiv);
+      });
+    })
+    .catch((error) => {
+      console.error("讀取區域內容失敗:", error);
+      showToast("載入區域內容失敗", "error");
+    });
+}
+
+// 編輯區域
+window.editZone = async (zoneId) => {
+  const modal = document.getElementById("zone-edit-modal");
+  const titleEl = document.getElementById("zone-edit-title");
+  const statusInput = document.getElementById("zone-edit-status");
+  const taskInput = document.getElementById("zone-edit-task");
+  const reminderInput = document.getElementById("zone-edit-reminder");
+  const saveBtn = document.getElementById("zone-edit-save");
+  const cancelBtn = document.getElementById("zone-edit-cancel");
+
+  if (!modal || !statusInput || !taskInput || !reminderInput) {
+    alert("找不到編輯區域的元素");
+    return;
+  }
+
+  const zone = ZONES.find((z) => z.id === zoneId);
+  if (!zone) {
+    alert("找不到區域");
+    return;
+  }
+
+  // 從 Firebase 讀取保存的內容
+  try {
+    const zonesRef = ref(db, "zones_content/" + zoneId);
+    const snapshot = await get(zonesRef);
+    const savedContent = snapshot.exists() ? snapshot.val() : {};
+    const defaultParts = parseZoneDesc(zone.desc);
+
+    // 填充輸入框（優先使用保存的內容）
+    statusInput.value = savedContent.status || defaultParts.status;
+    taskInput.value = savedContent.task || defaultParts.task;
+    reminderInput.value = savedContent.reminder || defaultParts.reminder;
+  } catch (error) {
+    console.error("讀取區域內容失敗:", error);
+    // 如果讀取失敗，使用默認值
+    const defaultParts = parseZoneDesc(zone.desc);
+    statusInput.value = defaultParts.status;
+    taskInput.value = defaultParts.task;
+    reminderInput.value = defaultParts.reminder;
+  }
+
+  // 設置標題
+  if (titleEl) {
+    titleEl.textContent = `編輯 ${zone.name}`;
+  }
+
+  // 顯示 modal
+  modal.classList.add("show");
+
+  // 保存按鈕事件
+  const handleSave = async () => {
+    const status = statusInput.value.trim();
+    const task = taskInput.value.trim();
+    const reminder = reminderInput.value.trim();
+
+    if (!status && !task && !reminder) {
+      showToast("請至少填寫一項內容", "error");
+      return;
+    }
+
+    try {
+      const zonesRef = ref(db, "zones_content/" + zoneId);
+      await update(zonesRef, {
+        status: status,
+        task: task,
+        reminder: reminder,
+      });
+
+      modal.classList.remove("show");
+      showToast("區域內容已更新", "success");
+
+      // 重新渲染區域管理列表和區域顯示
+      renderAdminZones();
+      renderZones();
+
+      // 移除事件監聽器
+      saveBtn.onclick = null;
+      cancelBtn.onclick = null;
+      modal.onclick = null;
+    } catch (error) {
+      console.error("保存區域內容失敗:", error);
+      showToast(
+        "保存失敗: " + (error.message || "請檢查 Firebase 權限設定"),
+        "error"
+      );
+    }
+  };
+
+  // 取消按鈕事件
+  const handleCancel = () => {
+    modal.classList.remove("show");
+    // 移除事件監聽器
+    saveBtn.onclick = null;
+    cancelBtn.onclick = null;
+    modal.onclick = null;
+  };
+
+  // 添加事件監聽器
+  saveBtn.onclick = handleSave;
+  cancelBtn.onclick = handleCancel;
+
+  // 點擊背景關閉
+  const handleModalClick = (e) => {
+    if (e.target === modal) {
+      handleCancel();
+    }
+  };
+  modal.onclick = handleModalClick;
+};
+
 // 庫存渲染
 function renderAdminStock() {
   const container = document.getElementById("admin-stock-list");
@@ -1585,6 +2396,7 @@ window.promptAdmin = () => {
       showPage("p-admin");
       loadAdminData();
       renderAdminStock();
+      startAdminSeatsPolling();
       initMaintenanceToggle();
     } else if (pwd !== null) {
       alert("密碼錯誤");
@@ -1605,6 +2417,7 @@ window.promptAdmin = () => {
       showPage("p-admin");
       loadAdminData();
       renderAdminStock();
+      startAdminSeatsPolling();
       initMaintenanceToggle();
     } else if (pwd !== "") {
       showToast("密碼錯誤", "error");
@@ -1753,6 +2566,18 @@ if (document.readyState === "loading") {
 } else {
   console.log("DOM 已就緒，Toast 已準備就緒");
 }
+
+// 點擊背景關閉座位模态框
+setTimeout(() => {
+  const seatsModal = document.getElementById("seats-modal");
+  if (seatsModal) {
+    seatsModal.addEventListener("click", (e) => {
+      if (e.target === seatsModal) {
+        closeSeatsModal();
+      }
+    });
+  }
+}, 100);
 
 console.log("模組加載完成");
 console.log("使用 Firebase Realtime Database");
