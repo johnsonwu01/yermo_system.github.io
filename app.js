@@ -12,29 +12,29 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 //Firebase 配置 - 正式
-// const firebaseConfig = {
-//   apiKey: "AIzaSyC856BX7Sl6iHyjDIyOwe4nh5Q1Pea-tvk",
-//   authDomain: "yermo-acf82.firebaseapp.com",
-//   databaseURL:
-//     "https://yermo-acf82-default-rtdb.asia-southeast1.firebasedatabase.app",
-//   projectId: "yermo-acf82",
-//   storageBucket: "yermo-acf82.firebasestorage.app",
-//   messagingSenderId: "802358752702",
-//   appId: "1:802358752702:web:192c3e5f7f6a9f7f8e35ef",
-//   measurementId: "G-47QMRFYW7C",
-// };
+const firebaseConfig = {
+  apiKey: "AIzaSyC856BX7Sl6iHyjDIyOwe4nh5Q1Pea-tvk",
+  authDomain: "yermo-acf82.firebaseapp.com",
+  databaseURL:
+    "https://yermo-acf82-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "yermo-acf82",
+  storageBucket: "yermo-acf82.firebasestorage.app",
+  messagingSenderId: "802358752702",
+  appId: "1:802358752702:web:192c3e5f7f6a9f7f8e35ef",
+  measurementId: "G-47QMRFYW7C",
+};
 
 //本地測試
-const firebaseConfig = {
-  apiKey: "AIzaSyAC3oTXktNUrgl331CU4-mnJvNm8paUywE",
-  authDomain: "yermonew.firebaseapp.com",
-  databaseURL: "https://yermonew-default-rtdb.firebaseio.com",
-  projectId: "yermonew",
-  storageBucket: "yermonew.firebasestorage.app",
-  messagingSenderId: "82246020578",
-  appId: "1:82246020578:web:4bb70cbcaa6067d4e61dbb",
-  measurementId: "G-7LJVSRRV0M",
-};
+// const firebaseConfig = {
+//   apiKey: "AIzaSyAC3oTXktNUrgl331CU4-mnJvNm8paUywE",
+//   authDomain: "yermonew.firebaseapp.com",
+//   databaseURL: "https://yermonew-default-rtdb.firebaseio.com",
+//   projectId: "yermonew",
+//   storageBucket: "yermonew.firebasestorage.app",
+//   messagingSenderId: "82246020578",
+//   appId: "1:82246020578:web:4bb70cbcaa6067d4e61dbb",
+//   measurementId: "G-7LJVSRRV0M",
+// };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
