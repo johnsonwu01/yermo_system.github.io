@@ -351,14 +351,43 @@
         <p
           style="
             text-align: center;
-            font-size: 12px;
+            font-size: 16px;
             color: #888;
             margin-bottom: 20px;
           "
         >
-          探索五大區域，尋找屬於您的角落
+          請移動你的腳步<br />跟隨分區說明<br />尋找最適合的位置
         </p>
-        <div id="zone-container"></div>
+        <!-- 滑動容器 -->
+        <div
+          id="zone-swiper-wrapper"
+          style="
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 100%;
+          "
+        >
+          <div
+            id="zone-container"
+            style="
+              display: flex;
+              transition: transform 0.3s ease;
+              will-change: transform;
+            "
+          ></div>
+        </div>
+        <!-- 區域指示器 -->
+        <div
+          id="zone-indicators"
+          style="
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 15px;
+          "
+        ></div>
       </div>
 
       <!-- 頁面 4: 選位 -->
