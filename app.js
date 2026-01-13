@@ -611,7 +611,8 @@ let zoneSwiperInitialized = false;
 // 初始化滑動功能
 function initZoneSwiper() {
   const zoneContainer = document.getElementById("zone-container");
-  if (!zoneContainer) return;
+  const zoneWrapper = document.getElementById("zone-swiper-wrapper");
+  if (!zoneContainer || !zoneWrapper) return;
 
   // 如果已經初始化過，先移除舊的監聽器
   if (zoneSwiperInitialized) {
@@ -652,17 +653,26 @@ function initZoneSwiper() {
     const diffX = currentX - startX;
     const diffY = currentY - startY;
 
-    // 判斷滑動方向：如果水平移動距離大於垂直移動距離，則視為水平滑動
-    if (!isHorizontalSwipe && Math.abs(diffX) > 10) {
-      // 只有在水平移動距離明顯大於垂直移動距離時，才標記為水平滑動
+    // 更早地判斷滑動方向：在第一次移動時就判斷（降低閾值到5px）
+    if (!isHorizontalSwipe && (Math.abs(diffX) > 5 || Math.abs(diffY) > 5)) {
+      // 如果水平移動距離大於垂直移動距離，則視為水平滑動
       if (Math.abs(diffX) > Math.abs(diffY)) {
         isHorizontalSwipe = true;
       }
     }
 
-    // 如果是水平滑動，阻止默認的滾動行為
+    // 如果是水平滑動，立即阻止默認的滾動行為並執行滑動
     if (isHorizontalSwipe) {
       e.preventDefault();
+      e.stopPropagation();
+      const diff = diffX;
+      currentTranslate = startTranslate + diff;
+      zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
+    } else if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 3) {
+      // 如果水平移動明顯，即使還沒標記，也先阻止默認行為
+      e.preventDefault();
+      e.stopPropagation();
+      isHorizontalSwipe = true;
       const diff = diffX;
       currentTranslate = startTranslate + diff;
       zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
@@ -757,17 +767,22 @@ function initZoneSwiper() {
     }
   };
 
-  // 添加事件監聽器
-  zoneContainer.addEventListener("touchstart", touchStartHandler, {
-    passive: true,
+  // 添加事件監聽器到 wrapper 和 container，確保能捕獲所有觸摸事件
+  // 在 wrapper 上也添加，以便更早地阻止默認行為
+  [zoneWrapper, zoneContainer].forEach((element) => {
+    element.addEventListener("touchstart", touchStartHandler, {
+      passive: true,
+    });
+    // touchmove 需要非 passive，以便在水平滑動時阻止默認滾動
+    element.addEventListener("touchmove", touchMoveHandler, {
+      passive: false,
+    });
+    element.addEventListener("touchend", touchEndHandler, {
+      passive: true,
+    });
   });
-  // touchmove 需要非 passive，以便在水平滑動時阻止默認滾動
-  zoneContainer.addEventListener("touchmove", touchMoveHandler, {
-    passive: false,
-  });
-  zoneContainer.addEventListener("touchend", touchEndHandler, {
-    passive: true,
-  });
+
+  // 鼠標事件只添加到 container
   zoneContainer.addEventListener("mousedown", mouseDownHandler);
   zoneContainer.addEventListener("mousemove", mouseMoveHandler);
   zoneContainer.addEventListener("mouseup", mouseUpHandler);

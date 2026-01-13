@@ -125,6 +125,8 @@ h1 {
   padding: 8px;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5),
     inset 0 -2px 8px rgba(0, 0, 0, 0.3);
+  /* 允許垂直滾動，但水平滑動由 JavaScript 控制 */
+  touch-action: pan-y;
 }
 
 #zone-container {
@@ -132,6 +134,8 @@ h1 {
   transition: transform 0.3s ease;
   will-change: transform;
   padding: 0 15px;
+  /* 完全由 JavaScript 控制觸摸行為 */
+  touch-action: none;
 }
 
 .zone-card {
