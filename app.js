@@ -37,7 +37,7 @@ const firebaseConfig = {
 // };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
+console.log("1113");
 // --------------------------------------------------------
 // 2. 資料結構與全域變數
 // --------------------------------------------------------
@@ -653,7 +653,7 @@ function initZoneSwiper() {
     const diffX = currentX - startX;
     const diffY = currentY - startY;
 
-    // 更早地判斷滑動方向：在第一次移動時就判斷（降低閾值到5px）
+    // 立即判斷滑動方向：在第一次移動時就判斷（降低閾值到5px）
     if (!isHorizontalSwipe && (Math.abs(diffX) > 5 || Math.abs(diffY) > 5)) {
       // 如果水平移動距離大於垂直移動距離，則視為水平滑動
       if (Math.abs(diffX) > Math.abs(diffY)) {
@@ -669,7 +669,7 @@ function initZoneSwiper() {
       currentTranslate = startTranslate + diff;
       zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
     } else if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 3) {
-      // 如果水平移動明顯，即使還沒標記，也先阻止默認行為
+      // 如果水平移動明顯（超過3px且大於垂直移動），立即阻止默認行為
       e.preventDefault();
       e.stopPropagation();
       isHorizontalSwipe = true;
@@ -677,6 +677,8 @@ function initZoneSwiper() {
       currentTranslate = startTranslate + diff;
       zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
     }
+    // 如果是垂直滑動，由於 touch-action: pan-x，瀏覽器會自動阻止垂直滾動
+    // 但我們不處理垂直滑動，讓用戶在滑動區域外進行垂直滾動
   };
 
   // 觸摸結束
@@ -767,19 +769,16 @@ function initZoneSwiper() {
     }
   };
 
-  // 添加事件監聽器到 wrapper 和 container，確保能捕獲所有觸摸事件
-  // 在 wrapper 上也添加，以便更早地阻止默認行為
-  [zoneWrapper, zoneContainer].forEach((element) => {
-    element.addEventListener("touchstart", touchStartHandler, {
-      passive: true,
-    });
-    // touchmove 需要非 passive，以便在水平滑動時阻止默認滾動
-    element.addEventListener("touchmove", touchMoveHandler, {
-      passive: false,
-    });
-    element.addEventListener("touchend", touchEndHandler, {
-      passive: true,
-    });
+  // 只在 container 上添加事件監聽器，避免重複處理
+  zoneContainer.addEventListener("touchstart", touchStartHandler, {
+    passive: true,
+  });
+  // touchmove 需要非 passive，以便在水平滑動時阻止默認滾動
+  zoneContainer.addEventListener("touchmove", touchMoveHandler, {
+    passive: false,
+  });
+  zoneContainer.addEventListener("touchend", touchEndHandler, {
+    passive: true,
   });
 
   // 鼠標事件只添加到 container
