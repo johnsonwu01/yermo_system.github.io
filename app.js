@@ -626,15 +626,19 @@ function initZoneSwiper() {
   }
 
   let startX = 0;
+  let startY = 0;
   let currentX = 0;
   let isDragging = false;
   let startTranslate = 0;
   let currentTranslate = 0;
+  let isHorizontalSwipe = false; // 標記是否為水平滑動
 
   // 觸摸開始
   const touchStartHandler = (e) => {
     startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
     isDragging = true;
+    isHorizontalSwipe = false; // 重置標記
     startTranslate = currentTranslate;
     zoneContainer.style.transition = "none";
   };
@@ -642,10 +646,27 @@ function initZoneSwiper() {
   // 觸摸移動
   const touchMoveHandler = (e) => {
     if (!isDragging) return;
+
     currentX = e.touches[0].clientX;
-    const diff = currentX - startX;
-    currentTranslate = startTranslate + diff;
-    zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - startX;
+    const diffY = currentY - startY;
+
+    // 判斷滑動方向：如果水平移動距離大於垂直移動距離，則視為水平滑動
+    if (!isHorizontalSwipe && Math.abs(diffX) > 10) {
+      // 只有在水平移動距離明顯大於垂直移動距離時，才標記為水平滑動
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        isHorizontalSwipe = true;
+      }
+    }
+
+    // 如果是水平滑動，阻止默認的滾動行為
+    if (isHorizontalSwipe) {
+      e.preventDefault();
+      const diff = diffX;
+      currentTranslate = startTranslate + diff;
+      zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
+    }
   };
 
   // 觸摸結束
@@ -654,27 +675,34 @@ function initZoneSwiper() {
     isDragging = false;
     zoneContainer.style.transition = "transform 0.3s ease";
 
-    const threshold = 50; // 滑動閾值
-    const diff = currentX - startX;
+    // 只有當確定是水平滑動時，才處理切換區域
+    if (isHorizontalSwipe) {
+      const threshold = 50; // 滑動閾值
+      const diff = currentX - startX;
 
-    if (Math.abs(diff) > threshold) {
-      if (diff > 0 && currentZoneIndex > 0) {
-        // 向右滑動，顯示上一個區域
-        goToZone(currentZoneIndex - 1);
-      } else if (diff < 0 && currentZoneIndex < availableZones.length - 1) {
-        // 向左滑動，顯示下一個區域
-        goToZone(currentZoneIndex + 1);
+      if (Math.abs(diff) > threshold) {
+        if (diff > 0 && currentZoneIndex > 0) {
+          // 向右滑動，顯示上一個區域
+          goToZone(currentZoneIndex - 1);
+        } else if (diff < 0 && currentZoneIndex < availableZones.length - 1) {
+          // 向左滑動，顯示下一個區域
+          goToZone(currentZoneIndex + 1);
+        } else {
+          // 回到當前位置
+          updateZonePosition();
+        }
       } else {
         // 回到當前位置
         updateZonePosition();
       }
     } else {
-      // 回到當前位置
+      // 如果不是水平滑動，直接回到當前位置
       updateZonePosition();
     }
 
     currentTranslate = calculateTranslateX(currentZoneIndex);
     startTranslate = currentTranslate;
+    isHorizontalSwipe = false; // 重置標記
   };
 
   // 鼠標事件（桌面端支持）
@@ -733,8 +761,9 @@ function initZoneSwiper() {
   zoneContainer.addEventListener("touchstart", touchStartHandler, {
     passive: true,
   });
+  // touchmove 需要非 passive，以便在水平滑動時阻止默認滾動
   zoneContainer.addEventListener("touchmove", touchMoveHandler, {
-    passive: true,
+    passive: false,
   });
   zoneContainer.addEventListener("touchend", touchEndHandler, {
     passive: true,
