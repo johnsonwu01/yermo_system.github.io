@@ -37,7 +37,7 @@ const firebaseConfig = {
 // };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-console.log("1114");
+console.log("1115");
 // --------------------------------------------------------
 // 2. 資料結構與全域變數
 // --------------------------------------------------------
@@ -646,6 +646,32 @@ function initZoneSwiper() {
 
   // 觸摸移動
   const touchMoveHandler = (e) => {
+    // 如果沒有開始拖動，但檢測到水平移動，重新初始化拖動狀態
+    if (!isDragging && e.touches.length > 0) {
+      const touchX = e.touches[0].clientX;
+      const touchY = e.touches[0].clientY;
+      // 如果這是第一次移動，初始化拖動狀態
+      if (startX === 0 && startY === 0) {
+        startX = touchX;
+        startY = touchY;
+        isDragging = true;
+        startTranslate = currentTranslate;
+        zoneContainer.style.transition = "none";
+      } else {
+        // 計算移動距離
+        const diffX = touchX - startX;
+        const diffY = touchY - startY;
+        // 如果水平移動明顯，重新開始拖動
+        if (Math.abs(diffX) > 5 && Math.abs(diffX) > Math.abs(diffY)) {
+          isDragging = true;
+          startTranslate = currentTranslate;
+          zoneContainer.style.transition = "none";
+        } else {
+          return; // 不是水平移動，不處理
+        }
+      }
+    }
+
     if (!isDragging) return;
 
     currentX = e.touches[0].clientX;
@@ -682,13 +708,21 @@ function initZoneSwiper() {
   };
 
   // 觸摸結束
-  const touchEndHandler = () => {
-    if (!isDragging) return;
+  const touchEndHandler = (e) => {
+    // 如果沒有拖動且沒有起始位置，直接返回
+    if (!isDragging && startX === 0 && startY === 0) {
+      return;
+    }
+
+    // 保存拖動狀態
+    const wasDragging = isDragging;
+
+    // 重置拖動狀態
     isDragging = false;
     zoneContainer.style.transition = "transform 0.3s ease";
 
     // 只有當確定是水平滑動時，才處理切換區域
-    if (isHorizontalSwipe) {
+    if (wasDragging && isHorizontalSwipe) {
       const threshold = 50; // 滑動閾值
       const diff = currentX - startX;
 
@@ -707,15 +741,22 @@ function initZoneSwiper() {
         // 回到當前位置
         updateZonePosition();
       }
-    } else {
+    } else if (wasDragging) {
       // 如果不是水平滑動，直接回到當前位置
       updateZonePosition();
     }
 
     // 更新 currentTranslate 為正確的值（在 updateZonePosition 或 goToZone 之後）
-    currentTranslate = calculateTranslateX(currentZoneIndex);
-    startTranslate = currentTranslate;
+    if (wasDragging) {
+      currentTranslate = calculateTranslateX(currentZoneIndex);
+      startTranslate = currentTranslate;
+    }
+
     isHorizontalSwipe = false; // 重置標記
+
+    // 重置起始位置，為下一次拖動做準備
+    startX = 0;
+    startY = 0;
   };
 
   // 鼠標事件（桌面端支持）
@@ -770,16 +811,21 @@ function initZoneSwiper() {
     }
   };
 
-  // 只在 container 上添加事件監聽器，避免重複處理
-  zoneContainer.addEventListener("touchstart", touchStartHandler, {
-    passive: true,
-  });
-  // touchmove 需要非 passive，以便在水平滑動時阻止默認滾動
-  zoneContainer.addEventListener("touchmove", touchMoveHandler, {
-    passive: false,
-  });
-  zoneContainer.addEventListener("touchend", touchEndHandler, {
-    passive: true,
+  // 在 wrapper 和 container 上都添加事件監聽器，確保能捕獲所有觸摸事件
+  [zoneWrapper, zoneContainer].forEach((element) => {
+    element.addEventListener("touchstart", touchStartHandler, {
+      passive: true,
+    });
+    // touchmove 需要非 passive，以便在水平滑動時阻止默認滾動
+    element.addEventListener("touchmove", touchMoveHandler, {
+      passive: false,
+    });
+    element.addEventListener("touchend", touchEndHandler, {
+      passive: true,
+    });
+    element.addEventListener("touchcancel", touchEndHandler, {
+      passive: true,
+    });
   });
 
   // 鼠標事件只添加到 container
