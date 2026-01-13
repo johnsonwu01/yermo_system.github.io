@@ -37,7 +37,7 @@ const firebaseConfig = {
 // };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-console.log("1113");
+console.log("1114");
 // --------------------------------------------------------
 // 2. 資料結構與全域變數
 // --------------------------------------------------------
@@ -665,17 +665,17 @@ function initZoneSwiper() {
     if (isHorizontalSwipe) {
       e.preventDefault();
       e.stopPropagation();
-      const diff = diffX;
-      currentTranslate = startTranslate + diff;
-      zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
+      // 計算臨時的 translate 值（不更新 currentTranslate，只在視覺上移動）
+      const tempTranslate = startTranslate + diffX;
+      zoneContainer.style.transform = `translateX(${tempTranslate}px)`;
     } else if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 3) {
       // 如果水平移動明顯（超過3px且大於垂直移動），立即阻止默認行為
       e.preventDefault();
       e.stopPropagation();
       isHorizontalSwipe = true;
-      const diff = diffX;
-      currentTranslate = startTranslate + diff;
-      zoneContainer.style.transform = `translateX(${currentTranslate}px)`;
+      // 計算臨時的 translate 值（不更新 currentTranslate，只在視覺上移動）
+      const tempTranslate = startTranslate + diffX;
+      zoneContainer.style.transform = `translateX(${tempTranslate}px)`;
     }
     // 如果是垂直滑動，由於 touch-action: pan-x，瀏覽器會自動阻止垂直滾動
     // 但我們不處理垂直滑動，讓用戶在滑動區域外進行垂直滾動
@@ -712,6 +712,7 @@ function initZoneSwiper() {
       updateZonePosition();
     }
 
+    // 更新 currentTranslate 為正確的值（在 updateZonePosition 或 goToZone 之後）
     currentTranslate = calculateTranslateX(currentZoneIndex);
     startTranslate = currentTranslate;
     isHorizontalSwipe = false; // 重置標記
